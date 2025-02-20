@@ -21,34 +21,47 @@ class Welcome:
             json.dump(self.config, f, indent=4)
             
     async def setup(self):
-        pass
-        
-    @app_commands.command(name="setwelcome", description="Установить канал для приветствий")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def setwelcome(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        if not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message("Пожалуйста, выберите текстовый канал!", ephemeral=True)
-            return
-            
-        # Проверяем права бота
-        if not channel.permissions_for(interaction.guild.me).send_messages:
-            await interaction.response.send_message("У меня нет прав для отправки сообщений в этот канал!", ephemeral=True)
-            return
-            
-        if not channel.permissions_for(interaction.guild.me).embed_links:
-            await interaction.response.send_message("У меня нет прав для отправки эмбедов в этот канал!", ephemeral=True)
-            return
-            
-        self.config[str(interaction.guild.id)] = channel.id
-        self.save_config()
-        
-        embed = discord.Embed(
-            title="✅ Канал приветствий установлен",
-            description=f"Приветствия будут отправляться в канал {channel.mention}",
-            color=discord.Color.green()
+        @self.bot.tree.command(
+            name="setwelcome",
+            description="Установить канал для приветствий"
         )
-        await interaction.response.send_message(embed=embed)
-        
+        @app_commands.checks.has_permissions(administrator=True)
+        async def setwelcome(
+            interaction: discord.Interaction,
+            channel: discord.TextChannel
+        ):
+            if not isinstance(channel, discord.TextChannel):
+                await interaction.response.send_message(
+                    "Пожалуйста, выберите текстовый канал!",
+                    ephemeral=True
+                )
+                return
+                
+            # Проверяем права бота
+            if not channel.permissions_for(interaction.guild.me).send_messages:
+                await interaction.response.send_message(
+                    "У меня нет прав для отправки сообщений в этот канал!",
+                    ephemeral=True
+                )
+                return
+                
+            if not channel.permissions_for(interaction.guild.me).embed_links:
+                await interaction.response.send_message(
+                    "У меня нет прав для отправки эмбедов в этот канал!",
+                    ephemeral=True
+                )
+                return
+                
+            self.config[str(interaction.guild.id)] = channel.id
+            self.save_config()
+            
+            embed = discord.Embed(
+                title="✅ Канал приветствий установлен",
+                description=f"Приветствия будут отправляться в канал {channel.mention}",
+                color=discord.Color.green()
+            )
+            await interaction.response.send_message(embed=embed)
+            
     async def send_welcome(self, member):
         if str(member.guild.id) not in self.config:
             return
@@ -62,9 +75,6 @@ class Welcome:
         
         # Отправляем сообщение с карточкой
         try:
-            await channel.send(
-                f"👋 Добро пожаловать на сервер, {member.mention}!",
-                file=welcome_card
-            )
+            await channel.send(file=welcome_card)
         except:
             pass 

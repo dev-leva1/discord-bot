@@ -80,6 +80,7 @@ async def on_message_edit(before, after):
 @bot.event
 async def on_member_join(member):
     await bot.logging.log_member_join(member)
+    await bot.welcome.send_welcome(member)
 
 @bot.event
 async def on_member_remove(member):
