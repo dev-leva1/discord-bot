@@ -1,6 +1,6 @@
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 import json
 import leveling_system
 from datetime import datetime
@@ -10,12 +10,36 @@ from roles import RoleRewards
 from automod import AutoMod
 from logging_system import LoggingSystem
 from image_generator import ImageGenerator
+from tickets import TicketSystem
+from temp_voice import TempVoice
+from warning_system import WarningSystem
 import os
 from dotenv import load_dotenv
+from database.db import init_db, get_db, get_redis
+from utils.monitoring import start_metrics_server, monitor_command, track_message, update_active_users, capture_error
+import asyncio
+import logging
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('bot.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.guilds = True
+intents.guild_messages = True
+intents.guild_reactions = True
+intents.voice_states = True
+intents.presences = True
+intents.moderation = True
 
 class Bot(commands.Bot):
     def __init__(self):
@@ -27,45 +51,127 @@ class Bot(commands.Bot):
         self.automod = AutoMod(self)
         self.logging = LoggingSystem(self)
         self.image_generator = ImageGenerator()
+        self.tickets = TicketSystem(self)
+        self.temp_voice = TempVoice(self)
+        self.warnings = WarningSystem(self)
+        
+        # Запуск фоновых задач
+        self.cleanup_tasks.start()
+        self.update_metrics.start()
         
     async def setup_hook(self):
+        # Инициализация базы данных
+        init_db()
+        
+        # Запуск метрик
+        start_metrics_server()
+        
+        # Настройка модулей
         await self.moderation.setup()
         await self.welcome.setup()
         await self.role_rewards.setup()
         await self.automod.setup()
         await self.logging.setup()
+        await self.tickets.setup()
+        await self.temp_voice.setup()
+        await self.warnings.setup()
         await self.tree.sync()
         
+    @tasks.loop(hours=1)
+    async def cleanup_tasks(self):
+        try:
+            # Очистка старых предупреждений
+            with get_db() as db:
+                self.warnings.cleanup_expired_warnings(db)
+            
+            # Очистка неактивных голосовых каналов
+            await self.temp_voice.cleanup_inactive_channels()
+            
+            # Очистка кэша
+            redis = get_redis()
+            redis.delete('temp_cache:*')
+            
+        except Exception as e:
+            logger.error(f"Error in cleanup tasks: {str(e)}")
+            capture_error(e)
+    
+    @tasks.loop(minutes=5)
+    async def update_metrics(self):
+        try:
+            total_users = sum(guild.member_count for guild in self.guilds)
+            update_active_users(total_users)
+        except Exception as e:
+            logger.error(f"Error updating metrics: {str(e)}")
+            capture_error(e)
+    
+    async def on_error(self, event_method, *args, **kwargs):
+        error = args[0] if args else None
+        logger.error(f"Error in {event_method}: {str(error)}")
+        capture_error(error, {'event': event_method})
+    
+    async def on_command_error(self, ctx, error):
+        if isinstance(error, commands.CommandNotFound):
+            return
+        
+        logger.error(f"Command error: {str(error)}")
+        capture_error(error, {
+            'command': ctx.command.name if ctx.command else 'Unknown',
+            'guild': ctx.guild.id if ctx.guild else None,
+            'channel': ctx.channel.id,
+            'user': ctx.author.id
+        })
+        
+        await ctx.send(f"Произошла ошибка при выполнении команды: {str(error)}")
+
 bot = Bot()
 
 @bot.event
 async def on_ready():
-    print(f'{bot.user} запущен и готов к работе!')
+    logger.info(f'{bot.user} запущен и готов к работе!')
     print('Slash-команды:')
+    print('Основные:')
     print('/rank - Показать ваш уровень')
     print('/leaderboard - Таблица лидеров')
     print('/help - Список команд')
+    print('\nМодерация:')
     print('/ban - Забанить пользователя')
     print('/kick - Выгнать пользователя')
     print('/mute - Замутить пользователя')
     print('/clear - Очистить сообщения')
+    print('/warn_add - Выдать предупреждение')
+    print('/warn_remove - Удалить предупреждение')
+    print('/warn_list - Список предупреждений')
+    print('/warn_clear - Очистить все предупреждения')
+    print('\nТикеты:')
+    print('/ticket_create - Создать тикет')
+    print('/ticket_close - Закрыть тикет')
+    print('/ticket_setup - Настроить систему тикетов')
+    print('\nГолосовые каналы:')
+    print('/voice_setup - Настроить временные каналы')
+    print('/voice_name - Изменить название канала')
+    print('/voice_limit - Установить лимит пользователей')
+    print('/voice_lock - Закрыть канал')
+    print('/voice_unlock - Открыть канал')
+    print('\nНастройки:')
     print('/setwelcome - Установить канал приветствий')
+    print('/setlogs - Установить канал для логов')
     print('/addrole - Добавить роль за уровень')
     print('/removerole - Удалить роль за уровень')
     print('/listroles - Список ролей за уровни')
     print('/automod - Настройка автомодерации')
-    print('/setlogs - Установить канал для логов')
 
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
-        
+    
+    track_message()
+    
     # Проверка автомодерации (пропускаем для владельца сервера)
-    if message.author.id != message.guild.owner_id:
+    if message.guild and message.author.id != message.guild.owner_id:
         if not await bot.automod.check_message(message):
             return
-        
+    
     await leveling_system.add_experience(message.author.id, message.guild.id)
     await bot.process_commands(message)
 
@@ -164,6 +270,28 @@ async def help(interaction: discord.Interaction):
         inline=False
     )
     
+    # Команды тикетов
+    embed.add_field(
+        name="🎫 Тикеты",
+        value="""
+• `/ticket create` - Создать тикет
+• `/ticket close` - Закрыть тикет
+        """,
+        inline=False
+    )
+    
+    # Команды голосовых каналов
+    embed.add_field(
+        name="🔊 Голосовые каналы",
+        value="""
+• `/voice name` - Изменить название канала
+• `/voice limit` - Установить лимит пользователей
+• `/voice lock` - Закрыть канал
+• `/voice unlock` - Открыть канал
+        """,
+        inline=False
+    )
+    
     # Команды модерации
     if show_mod_commands:
         embed.add_field(
@@ -173,6 +301,10 @@ async def help(interaction: discord.Interaction):
 • `/kick` - Выгнать пользователя
 • `/mute` - Временно замутить пользователя
 • `/clear` - Очистить сообщения в канале
+• `/warn add` - Выдать предупреждение
+• `/warn remove` - Удалить предупреждение
+• `/warn list` - Список предупреждений
+• `/warn clear` - Очистить все предупреждения
             """,
             inline=False
         )
@@ -201,6 +333,8 @@ async def help(interaction: discord.Interaction):
             value="""
 • `/setwelcome` - Установить канал приветствий
 • `/setlogs` - Установить канал для логов
+• `/ticket setup` - Настроить систему тикетов
+• `/voice setup` - Настроить временные голосовые каналы
             """,
             inline=False
         )
@@ -225,7 +359,14 @@ async def help(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed)
 
-# Загружаем токен из .env файла
-load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
-bot.run(TOKEN) 
+if __name__ == "__main__":
+    load_dotenv()
+    token = os.getenv('DISCORD_TOKEN')
+    if not token:
+        raise ValueError("DISCORD_TOKEN не найден в .env файле")
+    
+    try:
+        bot.run(token)
+    except Exception as e:
+        logger.critical(f"Критическая ошибка при запуске бота: {str(e)}")
+        capture_error(e) 
