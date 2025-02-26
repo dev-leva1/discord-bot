@@ -9,16 +9,24 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Используем SQLite вместо PostgreSQL для упрощения разработки
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///bot.db')
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+if DATABASE_URL.startswith('postgresql://'):
+    DATABASE_URL = 'sqlite:///bot.db'
 
 # Создаем движок базы данных
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 db_session = scoped_session(SessionLocal)
 
-# Создаем подключение к Redis
-redis_client = redis.from_url(REDIS_URL)
+# Инициализируем Redis только если он доступен
+try:
+    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    redis_client = redis.from_url(REDIS_URL)
+    redis_client.ping()
+except:
+    print("Redis недоступен. Используется локальное кэширование.")
+    redis_client = None
 
 @contextmanager
 def get_db():
@@ -34,16 +42,32 @@ def init_db():
 def get_redis():
     return redis_client
 
-# Функции кэширования
+# Функции кэширования с поддержкой локального кэширования
+_local_cache = {}
+
 def cache_set(key: str, value: str, expire: int = 3600):
-    redis_client.set(key, value, ex=expire)
+    if redis_client:
+        redis_client.set(key, value, ex=expire)
+    else:
+        _local_cache[key] = value
 
 def cache_get(key: str) -> str:
-    return redis_client.get(key)
+    if redis_client:
+        return redis_client.get(key)
+    return _local_cache.get(key)
 
 def cache_delete(key: str):
-    redis_client.delete(key)
+    if redis_client:
+        redis_client.delete(key)
+    elif key in _local_cache:
+        del _local_cache[key]
 
 def cache_clear_pattern(pattern: str):
-    for key in redis_client.scan_iter(pattern):
-        redis_client.delete(key) 
+    if redis_client:
+        for key in redis_client.scan_iter(pattern):
+            redis_client.delete(key)
+    else:
+        # Простая реализация для локального кэша
+        keys_to_delete = [k for k in _local_cache.keys() if pattern.replace('*', '') in k]
+        for key in keys_to_delete:
+            del _local_cache[key] 

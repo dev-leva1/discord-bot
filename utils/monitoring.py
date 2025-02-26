@@ -4,12 +4,20 @@ import time
 import os
 from functools import wraps
 
-# Инициализация Sentry
-sentry_sdk.init(
-    dsn=os.getenv('SENTRY_DSN'),
-    traces_sample_rate=1.0,
-    profiles_sample_rate=1.0,
-)
+# Инициализация Sentry только если есть DSN
+SENTRY_DSN = os.getenv('SENTRY_DSN')
+if SENTRY_DSN:
+    try:
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            traces_sample_rate=1.0,
+            profiles_sample_rate=1.0,
+        )
+        print("Sentry успешно инициализирован")
+    except Exception as e:
+        print(f"Ошибка инициализации Sentry: {e}")
+else:
+    print("Sentry отключен (DSN не настроен)")
 
 # Метрики Prometheus
 COMMANDS_TOTAL = Counter('bot_commands_total', 'Total commands processed', ['command'])
@@ -19,7 +27,11 @@ ACTIVE_USERS = Gauge('bot_active_users', 'Number of active users')
 COMMAND_LATENCY = Histogram('bot_command_latency_seconds', 'Command processing time in seconds')
 
 def start_metrics_server(port=8000):
-    start_http_server(port)
+    try:
+        start_http_server(port)
+        print(f"Метрики Prometheus доступны на порту {port}")
+    except Exception as e:
+        print(f"Ошибка запуска сервера метрик: {e}")
 
 def monitor_command(func):
     @wraps(func)
@@ -34,7 +46,8 @@ def monitor_command(func):
             return result
         except Exception as e:
             COMMANDS_FAILED.labels(command=command_name).inc()
-            sentry_sdk.capture_exception(e)
+            if SENTRY_DSN:
+                sentry_sdk.capture_exception(e)
             raise
     
     return wrapper
@@ -46,4 +59,6 @@ def update_active_users(count):
     ACTIVE_USERS.set(count)
 
 def capture_error(error, context=None):
-    sentry_sdk.capture_exception(error, extra=context) 
+    if SENTRY_DSN:
+        sentry_sdk.capture_exception(error, extra=context)
+    print(f"Ошибка: {error}", f"Контекст: {context}" if context else "") 
