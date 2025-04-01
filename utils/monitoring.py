@@ -1,11 +1,13 @@
+"""Модуль для мониторинга и отслеживания метрик бота."""
+
 import sentry_sdk
 from prometheus_client import start_http_server, Counter, Gauge, Histogram
 import time
 import os
 from functools import wraps
+from typing import Any, Callable, Dict, Optional, TypeVar, cast
 
-# Инициализация Sentry только если есть DSN
-SENTRY_DSN = os.getenv('SENTRY_DSN')
+SENTRY_DSN: Optional[str] = os.getenv('SENTRY_DSN')
 if SENTRY_DSN:
     try:
         sentry_sdk.init(
@@ -19,23 +21,54 @@ if SENTRY_DSN:
 else:
     print("Sentry отключен (DSN не настроен)")
 
-# Метрики Prometheus
-COMMANDS_TOTAL = Counter('bot_commands_total', 'Total commands processed', ['command'])
-COMMANDS_FAILED = Counter('bot_commands_failed', 'Failed commands', ['command'])
-MESSAGES_PROCESSED = Counter('bot_messages_processed', 'Total messages processed')
-ACTIVE_USERS = Gauge('bot_active_users', 'Number of active users')
-COMMAND_LATENCY = Histogram('bot_command_latency_seconds', 'Command processing time in seconds')
+COMMANDS_TOTAL = Counter(
+    'bot_commands_total',
+    'Total commands processed',
+    ['command']
+)
+COMMANDS_FAILED = Counter(
+    'bot_commands_failed',
+    'Failed commands',
+    ['command']
+)
+MESSAGES_PROCESSED = Counter(
+    'bot_messages_processed',
+    'Total messages processed'
+)
+ACTIVE_USERS = Gauge(
+    'bot_active_users',
+    'Number of active users'
+)
+COMMAND_LATENCY = Histogram(
+    'bot_command_latency_seconds',
+    'Command processing time in seconds'
+)
 
-def start_metrics_server(port=8000):
+T = TypeVar('T')
+
+def start_metrics_server(port: int = 8000) -> None:
+    """Запуск сервера метрик Prometheus.
+    
+    Args:
+        port: Порт для сервера метрик
+    """
     try:
         start_http_server(port)
         print(f"Метрики Prometheus доступны на порту {port}")
     except Exception as e:
         print(f"Ошибка запуска сервера метрик: {e}")
 
-def monitor_command(func):
+def monitor_command(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Декоратор для мониторинга выполнения команд.
+    
+    Args:
+        func: Функция команды
+        
+    Returns:
+        Callable[..., Any]: Обернутая функция
+    """
     @wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         command_name = func.__name__
         start_time = time.time()
         
@@ -50,15 +83,33 @@ def monitor_command(func):
                 sentry_sdk.capture_exception(e)
             raise
     
-    return wrapper
+    return cast(Callable[..., Any], wrapper)
 
-def track_message():
+def track_message() -> None:
+    """Отслеживание обработанных сообщений."""
     MESSAGES_PROCESSED.inc()
 
-def update_active_users(count):
+def update_active_users(count: int) -> None:
+    """Обновление количества активных пользователей.
+    
+    Args:
+        count: Количество активных пользователей
+    """
     ACTIVE_USERS.set(count)
 
-def capture_error(error, context=None):
+def capture_error(
+    error: Exception,
+    context: Optional[Dict[str, Any]] = None
+) -> None:
+    """Захват и логирование ошибок.
+    
+    Args:
+        error: Объект ошибки
+        context: Дополнительный контекст
+    """
     if SENTRY_DSN:
         sentry_sdk.capture_exception(error, extra=context)
-    print(f"Ошибка: {error}", f"Контекст: {context}" if context else "") 
+    print(
+        f"Ошибка: {error}",
+        f"Контекст: {context}" if context else ""
+    ) 

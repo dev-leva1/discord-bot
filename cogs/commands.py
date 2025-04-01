@@ -1,3 +1,5 @@
+"""Модуль с основными командами бота."""
+
 from discord.ext import commands
 import discord
 from utils.monitoring import monitor_command
@@ -12,7 +14,6 @@ class Commands(commands.Cog):
         level, xp = await self.bot.leveling.get_level_xp(ctx.author.id, ctx.guild.id)
         next_level_xp = self.bot.leveling.get_xp_for_level(level)
         
-        # Создаем красивую карточку
         rank_card = await self.bot.image_generator.create_rank_card(
             ctx.author,
             level,
@@ -31,14 +32,12 @@ class Commands(commands.Cog):
             await ctx.send("На сервере пока нет участников с опытом!", ephemeral=True)
             return
             
-        # Преобразуем данные для генератора изображений
         leaders = []
         for data in leaders_data:
             user = ctx.guild.get_member(int(data["user_id"]))
             if user:
                 leaders.append((user, data["level"], data["xp"]))
                 
-        # Создаем красивую карточку лидерборда
         leaderboard_card = await self.bot.image_generator.create_leaderboard_card(
             ctx.guild.name,
             leaders
@@ -46,21 +45,19 @@ class Commands(commands.Cog):
         
         await ctx.send(file=leaderboard_card)
 
-    @commands.hybrid_command(name="help", description="Показывает список доступных команд")
+    @commands.hybrid_command(name="commands_list", description="Показывает список доступных команд")
     @monitor_command
-    async def help(self, ctx):
+    async def commands_list(self, ctx):
         embed = discord.Embed(
             title="📚 Помощь по командам",
             description="Список всех доступных команд:",
             color=discord.Color.blue()
         )
         
-        # Проверяем права пользователя
         is_owner = ctx.guild.owner_id == ctx.author.id
         show_admin_commands = is_owner or ctx.author.guild_permissions.administrator
         show_mod_commands = show_admin_commands or ctx.author.guild_permissions.ban_members
         
-        # Основные команды (доступны всем)
         embed.add_field(
             name="📊 Уровни и опыт", 
             value="""
@@ -70,7 +67,6 @@ class Commands(commands.Cog):
             inline=False
         )
         
-        # Команды тикетов
         embed.add_field(
             name="🎫 Тикеты",
             value="""
@@ -80,7 +76,6 @@ class Commands(commands.Cog):
             inline=False
         )
         
-        # Команды голосовых каналов
         embed.add_field(
             name="🔊 Голосовые каналы",
             value="""
@@ -92,7 +87,6 @@ class Commands(commands.Cog):
             inline=False
         )
         
-        # Команды модерации
         if show_mod_commands:
             embed.add_field(
                 name="🛡️ Модерация",
@@ -109,7 +103,6 @@ class Commands(commands.Cog):
                 inline=False
             )
             
-        # Команды автомодерации
         if show_admin_commands:
             embed.add_field(
                 name="🤖 Автомодерация",
@@ -126,7 +119,6 @@ class Commands(commands.Cog):
                 inline=False
             )
         
-        # Настройки сервера
         if show_admin_commands:
             embed.add_field(
                 name="⚙️ Настройки сервера",
@@ -139,7 +131,6 @@ class Commands(commands.Cog):
                 inline=False
             )
             
-        # Настройки ролей
         if show_admin_commands:
             embed.add_field(
                 name="👥 Управление ролями",
@@ -151,7 +142,6 @@ class Commands(commands.Cog):
                 inline=False
             )
         
-        # Добавляем информацию о правах
         if is_owner:
             embed.set_footer(text="👑 Показаны все команды (вы владелец сервера)")
         elif not show_admin_commands:

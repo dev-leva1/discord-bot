@@ -1,26 +1,35 @@
+"""Основной модуль Discord бота."""
+
+import asyncio
+import json
+import logging
+import os
+from datetime import datetime
+
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-import json
-import leveling_system
-from datetime import datetime
-from moderation import Moderation
-from welcome import Welcome
-from roles import RoleRewards
-from automod import AutoMod
-from logging_system import LoggingSystem
-from image_generator import ImageGenerator
-from tickets import TicketSystem
-from temp_voice import TempVoice
-from warning_system import WarningSystem
-import os
 from dotenv import load_dotenv
-from database.db import init_db, get_db, get_redis
-from utils.monitoring import start_metrics_server, monitor_command, track_message, update_active_users, capture_error
-import asyncio
-import logging
 
-# Настройка логирования
+import leveling_system
+from automod import AutoMod
+from database.db import get_db, get_redis, init_db
+from image_generator import ImageGenerator
+from logging_system import LoggingSystem
+from moderation import Moderation
+from roles import RoleRewards
+from temp_voice import TempVoice
+from tickets import TicketSystem
+from utils.monitoring import (
+    capture_error,
+    monitor_command,
+    start_metrics_server,
+    track_message,
+    update_active_users,
+)
+from warning_system import WarningSystem
+from welcome import Welcome
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -42,11 +51,14 @@ intents.presences = True
 intents.moderation = True
 
 class Bot(commands.Bot):
+    """Основной класс бота."""
+    
     def __init__(self):
+        """Инициализация бота."""
         super().__init__(command_prefix='!', intents=intents)
         
     async def setup(self):
-        # Инициализация модулей
+        """Настройка и инициализация модулей бота."""
         self.moderation = Moderation(self)
         self.welcome = Welcome(self)
         self.role_rewards = RoleRewards(self)
@@ -58,7 +70,6 @@ class Bot(commands.Bot):
         self.temp_voice = TempVoice(self)
         self.warnings = WarningSystem(self)
         
-        # Загрузка когов
         for extension in ['cogs.events', 'cogs.commands']:
             try:
                 await self.load_extension(extension)
@@ -67,32 +78,27 @@ class Bot(commands.Bot):
                 logger.error(f"Ошибка при загрузке кога {extension}: {str(e)}")
                 capture_error(e)
         
-        # Запуск фоновых задач
         self.cleanup_tasks.start()
         self.update_metrics.start()
         
     async def setup_hook(self):
-        # Инициализация базы данных
+        """Дополнительная настройка при запуске бота."""
         init_db()
         
-        # Запуск метрик
         start_metrics_server()
         
-        # Настройка модулей
         await self.setup()
         await self.tree.sync()
         
     @tasks.loop(hours=1)
     async def cleanup_tasks(self):
+        """Очистка временных данных и кэша."""
         try:
-            # Очистка старых предупреждений
             with get_db() as db:
                 self.warnings.cleanup_expired_warnings(db)
             
-            # Очистка неактивных голосовых каналов
             await self.temp_voice.cleanup_inactive_channels()
             
-            # Очистка кэша
             redis = get_redis()
             if redis:
                 redis.delete('temp_cache:*')
@@ -103,6 +109,7 @@ class Bot(commands.Bot):
     
     @tasks.loop(minutes=5)
     async def update_metrics(self):
+        """Обновление метрик бота."""
         try:
             total_users = sum(guild.member_count for guild in self.guilds)
             update_active_users(total_users)
@@ -111,11 +118,24 @@ class Bot(commands.Bot):
             capture_error(e)
     
     async def on_error(self, event_method, *args, **kwargs):
+        """Обработка ошибок событий бота.
+        
+        Args:
+            event_method: Метод события
+            *args: Аргументы
+            **kwargs: Ключевые аргументы
+        """
         error = args[0] if args else None
         logger.error(f"Error in {event_method}: {str(error)}")
         capture_error(error, {'event': event_method})
     
     async def on_command_error(self, ctx, error):
+        """Обработка ошибок команд.
+        
+        Args:
+            ctx: Контекст команды
+            error: Ошибка
+        """
         if isinstance(error, commands.CommandNotFound):
             return
         
@@ -130,6 +150,7 @@ class Bot(commands.Bot):
         await ctx.send(f"Произошла ошибка при выполнении команды: {str(error)}")
 
 async def main():
+    """Основная функция запуска бота."""
     async with Bot() as bot:
         try:
             load_dotenv()

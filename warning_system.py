@@ -1,8 +1,11 @@
+"""Модуль системы предупреждений."""
+
 import discord
 from discord import app_commands
 from discord.ext import commands
 import json
 from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 
 class WarningSystem(commands.Cog):
     def __init__(self, bot):
@@ -14,18 +17,28 @@ class WarningSystem(commands.Cog):
         """Инициализация системы предупреждений"""
         print("Система предупреждений готова к работе")
 
-    def load_warnings(self):
+    def load_warnings(self) -> Dict:
+        """Загрузка предупреждений из файла.
+        
+        Returns:
+            Dict: Загруженные предупреждения
+        """
         try:
-            with open('warnings.json', 'r') as f:
+            with open('warnings.json', 'r', encoding='utf-8') as f:
                 return json.load(f)
         except FileNotFoundError:
-            with open('warnings.json', 'w') as f:
+            with open('warnings.json', 'w', encoding='utf-8') as f:
                 json.dump({}, f)
             return {}
 
-    def load_config(self):
+    def load_config(self) -> Dict:
+        """Загрузка конфигурации из файла.
+        
+        Returns:
+            Dict: Загруженная конфигурация
+        """
         try:
-            with open('warnings_config.json', 'r') as f:
+            with open('warnings_config.json', 'r', encoding='utf-8') as f:
                 return json.load(f)
         except FileNotFoundError:
             default_config = {
@@ -36,15 +49,25 @@ class WarningSystem(commands.Cog):
                     "10": "ban"
                 }
             }
-            with open('warnings_config.json', 'w') as f:
+            with open('warnings_config.json', 'w', encoding='utf-8') as f:
                 json.dump(default_config, f, indent=4)
             return default_config
 
-    def save_warnings(self):
-        with open('warnings.json', 'w') as f:
+    def save_warnings(self) -> None:
+        """Сохранение предупреждений в файл."""
+        with open('warnings.json', 'w', encoding='utf-8') as f:
             json.dump(self.warnings, f, indent=4)
 
-    def get_user_warnings(self, guild_id, user_id):
+    def get_user_warnings(self, guild_id: int, user_id: int) -> List[Dict]:
+        """Получение предупреждений пользователя.
+        
+        Args:
+            guild_id: ID сервера
+            user_id: ID пользователя
+            
+        Returns:
+            List[Dict]: Список предупреждений
+        """
         guild_id = str(guild_id)
         user_id = str(user_id)
         
@@ -55,6 +78,35 @@ class WarningSystem(commands.Cog):
             self.warnings[guild_id][user_id] = []
         
         return self.warnings[guild_id][user_id]
+
+    def cleanup_expired_warnings(self, db) -> None:
+        """Очистка устаревших предупреждений.
+        
+        Args:
+            db: Сессия базы данных
+        """
+        current_time = datetime.utcnow()
+        expiration_time = timedelta(days=30)  # Предупреждения истекают через 30 дней
+        
+        for guild_id in list(self.warnings.keys()):
+            for user_id in list(self.warnings[guild_id].keys()):
+                warnings = self.warnings[guild_id][user_id]
+                active_warnings = []
+                
+                for warning in warnings:
+                    warning_time = datetime.fromisoformat(warning["timestamp"])
+                    if current_time - warning_time < expiration_time:
+                        active_warnings.append(warning)
+                
+                if active_warnings:
+                    self.warnings[guild_id][user_id] = active_warnings
+                else:
+                    del self.warnings[guild_id][user_id]
+            
+            if not self.warnings[guild_id]:
+                del self.warnings[guild_id]
+        
+        self.save_warnings()
 
     @app_commands.command(name="warn_add", description="Выдать предупреждение участнику")
     @app_commands.checks.has_permissions(kick_members=True)
@@ -99,7 +151,6 @@ class WarningSystem(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
-        # Применяем наказание если достигнут порог
         for threshold, punishment in sorted(self.config["punishments"].items(), key=lambda x: int(x[0])):
             if warning_count == int(threshold):
                 if punishment == "mute_1h":
