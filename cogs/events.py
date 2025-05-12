@@ -48,21 +48,6 @@ class Events(commands.Cog):
         print('/automod - Настройка автомодерации')
 
     @commands.Cog.listener()
-    async def on_message(self, message):
-        if message.author.bot:
-            return
-        
-        track_message()
-        
-        # Проверка автомодерации (пропускаем для владельца сервера)
-        if message.guild and message.author.id != message.guild.owner_id:
-            if not await self.bot.automod.check_message(message):
-                return
-        
-        await self.bot.leveling.add_experience(message.author.id, message.guild.id)
-        await self.bot.process_commands(message)
-
-    @commands.Cog.listener()
     async def on_message_delete(self, message):
         await self.bot.logging.log_message_delete(message)
 
