@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from datetime import datetime
 
 import discord
@@ -30,6 +31,7 @@ from utils.monitoring import (
 from warning_system import WarningSystem
 from welcome import Welcome
 
+# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -40,6 +42,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Настройка интентов Discord
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -89,12 +92,23 @@ class Bot(commands.Bot):
     async def setup_hook(self):
         """Инициализация бота при запуске."""
         try:
+            logger.info("Начало инициализации бота...")
+            
             # Инициализация базы данных
+            logger.info("Инициализация базы данных...")
             await self.db.setup()
+            logger.info("База данных успешно инициализирована")
             
             # Загрузка когов
+            logger.info("Загрузка когов...")
             for extension in self.initial_extensions:
                 try:
+                    # Проверяем существование файла кога
+                    cog_path = extension.replace('.', '/') + '.py'
+                    if not os.path.exists(cog_path):
+                        logger.warning(f"Файл кога {cog_path} не найден, пропускаем")
+                        continue
+                        
                     await self.load_extension(extension)
                     logger.info(f"Загружен ког: {extension}")
                 except Exception as e:
@@ -104,8 +118,13 @@ class Bot(commands.Bot):
             # Синхронизация команд с Discord
             logger.info('Синхронизация команд...')
             
-            # Синхронизируем команды глобально
-            await self.tree.sync()
+            try:
+                # Синхронизируем команды глобально
+                await self.tree.sync()
+                logger.info('Глобальные команды синхронизированы')
+            except Exception as e:
+                logger.error(f'Ошибка при синхронизации глобальных команд: {str(e)}')
+                capture_error(e)
             
             # Синхронизируем команды для каждого сервера
             for guild in self.guilds:
@@ -120,41 +139,58 @@ class Bot(commands.Bot):
             logger.info('Все команды успешно синхронизированы!')
             
             # Запуск фоновых задач
+            logger.info('Запуск фоновых задач...')
             self.cleanup_tasks.start()
             self.update_metrics.start()
             
             # Инициализация метрик
             if self.use_metrics:
                 metrics_port = int(os.getenv('METRICS_PORT', '8000'))
+                logger.info(f'Запуск сервера метрик на порту {metrics_port}...')
                 start_metrics_server(metrics_port)
                 
+            logger.info("Инициализация бота завершена успешно!")
+                
         except Exception as e:
-            logger.error(f"Ошибка в setup_hook: {str(e)}")
+            logger.error(f"Критическая ошибка в setup_hook: {str(e)}", exc_info=True)
             raise
         
     @tasks.loop(hours=1)
     async def cleanup_tasks(self):
         """Очистка временных данных и кэша."""
         try:
+            logger.debug("Запуск задачи очистки временных данных...")
+            
+            # Очистка предупреждений
             with get_db() as db:
                 self.warnings.cleanup_expired_warnings(db)
+                logger.debug("Очистка устаревших предупреждений выполнена")
             
+            # Очистка неактивных голосовых каналов
             await self.temp_voice.cleanup_inactive_channels()
+            logger.debug("Очистка неактивных голосовых каналов выполнена")
             
+            # Очистка кэша Redis
             redis = get_redis()
             if redis:
-                # Используем патерн ключа для очистки временных данных
+                # Используем паттерн ключа для очистки временных данных
+                logger.debug("Очистка кэша Redis...")
                 cursor = 0
+                deleted_keys = 0
                 while True:
                     cursor, keys = redis.scan(cursor, match='temp_cache:*', count=100)
                     if keys:
                         redis.delete(*keys)
+                        deleted_keys += len(keys)
                     if cursor == 0:
                         break
+                logger.debug(f"Очистка кэша Redis выполнена, удалено {deleted_keys} ключей")
+            
+            logger.debug("Задача очистки временных данных завершена")
             
         except Exception as e:
-            logger.error(f"Error in cleanup tasks: {str(e)}")
-            capture_error(e)
+            logger.error(f"Ошибка в задаче cleanup_tasks: {str(e)}", exc_info=True)
+            capture_error(e, {'task': 'cleanup_tasks'})
     
     @tasks.loop(minutes=5)
     async def update_metrics(self):
@@ -163,11 +199,17 @@ class Bot(commands.Bot):
             return
             
         try:
+            logger.debug("Обновление метрик...")
+            
+            # Общее количество пользователей во всех серверах
             total_users = sum(guild.member_count for guild in self.guilds)
             update_active_users(total_users)
+            
+            logger.debug(f"Метрики обновлены: {total_users} пользователей")
+            
         except Exception as e:
-            logger.error(f"Error updating metrics: {str(e)}")
-            capture_error(e)
+            logger.error(f"Ошибка при обновлении метрик: {str(e)}", exc_info=True)
+            capture_error(e, {'task': 'update_metrics'})
     
     async def on_message(self, message):
         """Обработка сообщений.
@@ -181,7 +223,8 @@ class Bot(commands.Bot):
             
         try:
             # Трекинг сообщения для метрик
-            track_message()
+            guild_id = str(message.guild.id) if message.guild else 'dm'
+            track_message(guild_id)
             
             # Обработка сообщения системами бота
             await self.automod.check_message(message)
@@ -191,8 +234,8 @@ class Bot(commands.Bot):
             await self.process_commands(message)
             
         except Exception as e:
-            logger.error(f"Error in on_message: {str(e)}")
-            capture_error(e, {'event': 'on_message'})
+            logger.error(f"Ошибка в on_message: {str(e)}", exc_info=True)
+            capture_error(e, {'event': 'on_message', 'channel': message.channel.id, 'author': message.author.id})
     
     async def on_error(self, event_method, *args, **kwargs):
         """Обработка ошибок событий бота.
@@ -203,7 +246,7 @@ class Bot(commands.Bot):
             **kwargs: Ключевые аргументы
         """
         error = args[0] if args else None
-        logger.error(f"Error in {event_method}: {str(error)}")
+        logger.error(f"Ошибка в {event_method}: {str(error)}", exc_info=True)
         capture_error(error, {'event': event_method})
     
     async def on_command_error(self, ctx, error):
@@ -216,29 +259,73 @@ class Bot(commands.Bot):
         if isinstance(error, commands.CommandNotFound):
             return
         
-        logger.error(f"Command error: {str(error)}")
-        capture_error(error, {
+        error_context = {
             'command': ctx.command.name if ctx.command else 'Unknown',
             'guild': ctx.guild.id if ctx.guild else None,
             'channel': ctx.channel.id,
-            'user': ctx.author.id
-        })
+            'user': ctx.author.id,
+            'message': ctx.message.content if ctx.message else None
+        }
         
-        await ctx.send(f"Произошла ошибка при выполнении команды: {str(error)}")
+        # Логирование ошибки
+        logger.error(f"Ошибка команды: {str(error)}", exc_info=True)
+        capture_error(error, error_context)
+        
+        # Отправляем сообщение об ошибке пользователю
+        error_message = str(error)
+        
+        # Перехватываем и форматируем распространенные ошибки для улучшения UX
+        if isinstance(error, commands.MissingPermissions):
+            error_message = "У вас недостаточно прав для выполнения этой команды."
+        elif isinstance(error, commands.BotMissingPermissions):
+            error_message = "У бота недостаточно прав для выполнения этой команды."
+        elif isinstance(error, commands.BadArgument):
+            error_message = "Неверные аргументы команды. Проверьте правильность ввода."
+        elif isinstance(error, commands.MissingRequiredArgument):
+            error_message = f"Отсутствует обязательный аргумент: {error.param.name}"
+        
+        await ctx.send(f"Произошла ошибка при выполнении команды: {error_message}", ephemeral=True)
+
+    @cleanup_tasks.before_loop
+    @update_metrics.before_loop
+    async def before_tasks(self):
+        """Ожидание, пока бот будет готов перед запуском задач."""
+        await self.wait_until_ready()
+        logger.info("Бот готов, запуск фоновых задач...")
 
 async def main():
     """Основная функция запуска бота."""
     try:
+        # Загрузка переменных окружения
         load_dotenv()
+        logger.info("Загружены переменные окружения")
+        
+        # Проверка обязательных переменных окружения
         token = os.getenv('DISCORD_TOKEN')
         if not token:
+            logger.critical("DISCORD_TOKEN не найден в .env файле")
             raise ValueError("DISCORD_TOKEN не найден в .env файле")
         
+        logger.info("Токен Discord найден, запуск бота...")
+        
+        # Создание и запуск бота
         bot = Bot()
         await bot.start(token)
+        
+    except discord.errors.LoginFailure as e:
+        logger.critical(f"Ошибка авторизации в Discord: {str(e)}")
+        logger.critical("Пожалуйста, проверьте правильность токена Discord в файле .env")
+        sys.exit(1)
     except Exception as e:
-        logger.critical(f"Критическая ошибка при запуске бота: {str(e)}")
+        logger.critical(f"Критическая ошибка при запуске бота: {str(e)}", exc_info=True)
         capture_error(e)
+        sys.exit(1)
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Бот остановлен вручную (Ctrl+C)")
+    except Exception as e:
+        logger.critical(f"Необработанная ошибка: {str(e)}", exc_info=True)
+        sys.exit(1) 

@@ -114,7 +114,7 @@ class LevelingSystem:
         # Используем БД если доступна
         if self.use_db:
             try:
-                return await self._add_experience_db(member, user_id, guild_id)
+                return await self._add_experience_db(member, user_id, guild_id, current_time)
             except Exception as e:
                 logger.error(f"Ошибка при добавлении опыта в БД: {e}")
                 # Если произошла ошибка, то используем файловую систему
@@ -127,7 +127,8 @@ class LevelingSystem:
         self, 
         member: discord.Member, 
         user_id: str, 
-        guild_id: str
+        guild_id: str,
+        current_time: datetime
     ) -> Tuple[bool, Optional[int]]:
         """Добавление опыта пользователю через базу данных.
         
@@ -135,6 +136,7 @@ class LevelingSystem:
             member: Пользователь
             user_id: ID пользователя
             guild_id: ID сервера
+            current_time: Текущее время
             
         Returns:
             Tuple[bool, Optional[int]]: (Было ли повышение уровня, Новый уровень)
@@ -150,10 +152,32 @@ class LevelingSystem:
         
         if not user_data:
             # Если пользователя нет, добавляем его
-            await self.bot.db.execute(
-                "INSERT INTO levels (user_id, guild_id, xp, level, last_message_time) VALUES (?, ?, ?, ?, ?)",
-                (int(user_id), int(guild_id), xp_gain, 0, current_time.isoformat())
-            )
+            try:
+                # Проверяем, есть ли колонка last_message_time в таблице
+                table_info = await self.bot.db.fetch_all(
+                    "PRAGMA table_info(levels)"
+                )
+                columns = [col["name"] for col in table_info]
+                
+                if "last_message_time" in columns:
+                    # Если колонка существует
+                    await self.bot.db.execute(
+                        "INSERT INTO levels (user_id, guild_id, xp, level, last_message_time) VALUES (?, ?, ?, ?, ?)",
+                        (int(user_id), int(guild_id), xp_gain, 0, current_time.isoformat())
+                    )
+                else:
+                    # Если колонки нет, используем старую схему
+                    await self.bot.db.execute(
+                        "INSERT INTO levels (user_id, guild_id, xp, level) VALUES (?, ?, ?, ?)",
+                        (int(user_id), int(guild_id), xp_gain, 0)
+                    )
+            except Exception as e:
+                logger.error(f"Ошибка при добавлении пользователя в БД: {e}")
+                # Используем простой запрос без last_message_time
+                await self.bot.db.execute(
+                    "INSERT INTO levels (user_id, guild_id, xp, level) VALUES (?, ?, ?, ?)",
+                    (int(user_id), int(guild_id), xp_gain, 0)
+                )
             return False, None
         
         # Обновляем опыт пользователя
@@ -161,11 +185,33 @@ class LevelingSystem:
         current_level = user_data["level"]
         new_level = self.get_level_for_xp(current_xp)
         
-        # Обновляем данные в базе
-        await self.bot.db.execute(
-            "UPDATE levels SET xp = ?, level = ?, last_message_time = ? WHERE user_id = ? AND guild_id = ?",
-            (current_xp, new_level, current_time.isoformat(), int(user_id), int(guild_id))
-        )
+        # Обновляем данные в базе с проверкой наличия колонки last_message_time
+        try:
+            # Проверяем, есть ли колонка last_message_time в таблице
+            table_info = await self.bot.db.fetch_all(
+                "PRAGMA table_info(levels)"
+            )
+            columns = [col["name"] for col in table_info]
+            
+            if "last_message_time" in columns:
+                # Если колонка существует
+                await self.bot.db.execute(
+                    "UPDATE levels SET xp = ?, level = ?, last_message_time = ? WHERE user_id = ? AND guild_id = ?",
+                    (current_xp, new_level, current_time.isoformat(), int(user_id), int(guild_id))
+                )
+            else:
+                # Если колонки нет, используем старую схему
+                await self.bot.db.execute(
+                    "UPDATE levels SET xp = ?, level = ? WHERE user_id = ? AND guild_id = ?",
+                    (current_xp, new_level, int(user_id), int(guild_id))
+                )
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении опыта в БД: {e}")
+            # Используем простой запрос без last_message_time
+            await self.bot.db.execute(
+                "UPDATE levels SET xp = ?, level = ? WHERE user_id = ? AND guild_id = ?",
+                (current_xp, new_level, int(user_id), int(guild_id))
+            )
         
         # Если уровень повысился
         if new_level > current_level:
@@ -342,23 +388,50 @@ class LevelingSystem:
         if not self.use_db:
             return
             
-        for guild_id, guild_data in self.data.items():
-            for user_id, user_data in guild_data.items():
-                try:
-                    # Проверяем, есть ли пользователь в базе
-                    user_db = await self.bot.db.fetch_one(
-                        "SELECT user_id FROM levels WHERE user_id = ? AND guild_id = ?",
-                        (int(user_id), int(guild_id))
-                    )
-                    
-                    if not user_db:
-                        # Если пользователя нет, добавляем его
-                        await self.bot.db.execute(
-                            "INSERT INTO levels (user_id, guild_id, xp, level, last_message_time) VALUES (?, ?, ?, ?, ?)",
-                            (int(user_id), int(guild_id), user_data["xp"], user_data["level"], datetime.now().isoformat())
+        # Проверяем, есть ли колонка last_message_time в таблице
+        try:
+            table_info = await self.bot.db.fetch_all(
+                "PRAGMA table_info(levels)"
+            )
+            columns = [col["name"] for col in table_info]
+            
+            has_last_message_time = "last_message_time" in columns
+            
+            # Если колонки нет, добавляем её
+            if not has_last_message_time:
+                logger.info("Добавление колонки last_message_time в таблицу levels")
+                await self.bot.db.execute(
+                    "ALTER TABLE levels ADD COLUMN last_message_time TIMESTAMP"
+                )
+                
+            # Теперь мигрируем данные
+            for guild_id, guild_data in self.data.items():
+                for user_id, user_data in guild_data.items():
+                    try:
+                        # Проверяем, есть ли пользователь в базе
+                        user_db = await self.bot.db.fetch_one(
+                            "SELECT user_id FROM levels WHERE user_id = ? AND guild_id = ?",
+                            (int(user_id), int(guild_id))
                         )
-                except Exception as e:
-                    logger.error(f"Ошибка при миграции данных в БД: {e}")
+                        
+                        if not user_db:
+                            # Если пользователя нет, добавляем его
+                            current_time = datetime.now().isoformat()
+                            if has_last_message_time:
+                                await self.bot.db.execute(
+                                    "INSERT INTO levels (user_id, guild_id, xp, level, last_message_time) VALUES (?, ?, ?, ?, ?)",
+                                    (int(user_id), int(guild_id), user_data["xp"], user_data["level"], current_time)
+                                )
+                            else:
+                                await self.bot.db.execute(
+                                    "INSERT INTO levels (user_id, guild_id, xp, level) VALUES (?, ?, ?, ?)",
+                                    (int(user_id), int(guild_id), user_data["xp"], user_data["level"])
+                                )
+                    except Exception as e:
+                        logger.error(f"Ошибка при миграции данных в БД: {e}")
+        except Exception as e:
+            logger.error(f"Ошибка при проверке схемы таблицы levels: {e}")
+            self.use_db = False  # Используем файловую систему при ошибке
 
 leveling: Optional[LevelingSystem] = None
 
