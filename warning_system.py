@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 import json
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 class WarningSystem(commands.Cog):
     def __init__(self, bot):
@@ -108,32 +108,31 @@ class WarningSystem(commands.Cog):
         
         self.save_warnings()
 
-    @app_commands.command(name="warn_add", description="Выдать предупреждение участнику")
-    @app_commands.checks.has_permissions(kick_members=True)
+    @commands.hybrid_command(name="warn_add", description="Выдать предупреждение участнику")
+    @commands.has_permissions(kick_members=True)
     @app_commands.describe(
         member="Участник, которому нужно выдать предупреждение",
         reason="Причина предупреждения"
     )
-    async def add_warning(self, interaction: discord.Interaction, member: discord.Member, reason: str = "Причина не указана"):
+    async def add_warning(self, ctx: Union[commands.Context, discord.Interaction], member: discord.Member, reason: str = "Причина не указана"):
+        """Выдать предупреждение участнику."""
+        is_interaction = isinstance(ctx, discord.Interaction)
+        
         if member.bot:
-            return await interaction.response.send_message(
-                "Нельзя выдать предупреждение боту!",
-                ephemeral=True
-            )
+            response = "Нельзя выдать предупреждение боту!"
+            return await (ctx.response.send_message if is_interaction else ctx.send)(response, ephemeral=True)
 
-        if member.top_role >= interaction.user.top_role:
-            return await interaction.response.send_message(
-                "Вы не можете выдать предупреждение участнику с ролью выше или равной вашей!",
-                ephemeral=True
-            )
+        if member.top_role >= ctx.user.top_role:
+            response = "Вы не можете выдать предупреждение участнику с ролью выше или равной вашей!"
+            return await (ctx.response.send_message if is_interaction else ctx.send)(response, ephemeral=True)
 
         warning = {
             "reason": reason,
-            "moderator": interaction.user.id,
+            "moderator": ctx.user.id,
             "timestamp": datetime.utcnow().isoformat()
         }
 
-        warnings = self.get_user_warnings(interaction.guild.id, member.id)
+        warnings = self.get_user_warnings(ctx.guild.id, member.id)
         warnings.append(warning)
         self.save_warnings()
 
@@ -145,78 +144,78 @@ class WarningSystem(commands.Cog):
             timestamp=datetime.utcnow()
         )
         embed.add_field(name="Участник", value=f"{member.mention} ({member.id})", inline=False)
-        embed.add_field(name="Модератор", value=f"{interaction.user.mention}", inline=False)
+        embed.add_field(name="Модератор", value=f"{ctx.user.mention}", inline=False)
         embed.add_field(name="Причина", value=reason, inline=False)
         embed.add_field(name="Всего предупреждений", value=str(warning_count), inline=False)
 
-        await interaction.response.send_message(embed=embed)
+        await (ctx.response.send_message if is_interaction else ctx.send)(embed=embed)
 
+        send_followup = ctx.followup.send if is_interaction else ctx.send
+        
         for threshold, punishment in sorted(self.config["punishments"].items(), key=lambda x: int(x[0])):
             if warning_count == int(threshold):
                 if punishment == "mute_1h":
                     try:
                         await member.timeout(timedelta(hours=1), reason=f"Автоматический мут: {warning_count} предупреждений")
-                        await interaction.followup.send(f"{member.mention} получает мут на 1 час за {warning_count} предупреждений")
+                        await send_followup(f"{member.mention} получает мут на 1 час за {warning_count} предупреждений")
                     except discord.Forbidden:
-                        await interaction.followup.send("Не удалось выдать мут - недостаточно прав")
+                        await send_followup("Не удалось выдать мут - недостаточно прав")
                 
                 elif punishment == "mute_12h":
                     try:
                         await member.timeout(timedelta(hours=12), reason=f"Автоматический мут: {warning_count} предупреждений")
-                        await interaction.followup.send(f"{member.mention} получает мут на 12 часов за {warning_count} предупреждений")
+                        await send_followup(f"{member.mention} получает мут на 12 часов за {warning_count} предупреждений")
                     except discord.Forbidden:
-                        await interaction.followup.send("Не удалось выдать мут - недостаточно прав")
+                        await send_followup("Не удалось выдать мут - недостаточно прав")
                 
                 elif punishment == "kick":
                     try:
                         await member.kick(reason=f"Автоматический кик: {warning_count} предупреждений")
-                        await interaction.followup.send(f"{member.mention} был кикнут за {warning_count} предупреждений")
+                        await send_followup(f"{member.mention} был кикнут за {warning_count} предупреждений")
                     except discord.Forbidden:
-                        await interaction.followup.send("Не удалось кикнуть участника - недостаточно прав")
+                        await send_followup("Не удалось кикнуть участника - недостаточно прав")
                 
                 elif punishment == "ban":
                     try:
                         await member.ban(reason=f"Автоматический бан: {warning_count} предупреждений")
-                        await interaction.followup.send(f"{member.mention} был забанен за {warning_count} предупреждений")
+                        await send_followup(f"{member.mention} был забанен за {warning_count} предупреждений")
                     except discord.Forbidden:
-                        await interaction.followup.send("Не удалось забанить участника - недостаточно прав")
+                        await send_followup("Не удалось забанить участника - недостаточно прав")
 
-    @app_commands.command(name="warn_remove", description="Удалить предупреждение у участника")
-    @app_commands.checks.has_permissions(kick_members=True)
+    @commands.hybrid_command(name="warn_remove", description="Удалить предупреждение у участника")
+    @commands.has_permissions(kick_members=True)
     @app_commands.describe(
         member="Участник, у которого нужно удалить предупреждение",
         index="Номер предупреждения для удаления"
     )
-    async def remove_warning(self, interaction: discord.Interaction, member: discord.Member, index: int):
-        warnings = self.get_user_warnings(interaction.guild.id, member.id)
+    async def remove_warning(self, ctx: Union[commands.Context, discord.Interaction], member: discord.Member, index: int):
+        """Удалить предупреждение у участника."""
+        is_interaction = isinstance(ctx, discord.Interaction)
+        warnings = self.get_user_warnings(ctx.guild.id, member.id)
         
         if not warnings:
-            return await interaction.response.send_message(
-                "У этого участника нет предупреждений",
-                ephemeral=True
-            )
+            response = "У этого участника нет предупреждений"
+            return await (ctx.response.send_message if is_interaction else ctx.send)(response, ephemeral=True)
         
         if index < 1 or index > len(warnings):
-            return await interaction.response.send_message(
-                f"Укажите число от 1 до {len(warnings)}",
-                ephemeral=True
-            )
+            response = f"Укажите число от 1 до {len(warnings)}"
+            return await (ctx.response.send_message if is_interaction else ctx.send)(response, ephemeral=True)
         
         removed = warnings.pop(index - 1)
         self.save_warnings()
         
-        await interaction.response.send_message(f"Предупреждение #{index} было удалено у {member.mention}")
+        await (ctx.response.send_message if is_interaction else ctx.send)(f"Предупреждение #{index} было удалено у {member.mention}")
 
-    @app_commands.command(name="warn_list", description="Показать список предупреждений участника")
+    @commands.hybrid_command(name="warn_list", description="Показать список предупреждений участника")
     @app_commands.describe(member="Участник, чьи предупреждения нужно показать")
-    async def list_warnings(self, interaction: discord.Interaction, member: discord.Member):
-        warnings = self.get_user_warnings(interaction.guild.id, member.id)
+    async def list_warnings(self, ctx: Union[commands.Context, discord.Interaction], member: discord.Member):
+        """Показать список предупреждений участника."""
+        is_interaction = isinstance(ctx, discord.Interaction)
+        warnings = self.get_user_warnings(ctx.guild.id, member.id)
         
         if not warnings:
-            return await interaction.response.send_message(
-                "У этого участника нет предупреждений",
-                ephemeral=True
-            )
+            response = "У этого участника нет предупреждений"
+            return await (ctx.response.send_message if is_interaction else ctx.send)(response, ephemeral=True)
         
         embed = discord.Embed(
             title=f"Предупреждения | {member.display_name}",
@@ -224,7 +223,7 @@ class WarningSystem(commands.Cog):
         )
         
         for i, warning in enumerate(warnings, 1):
-            moderator = interaction.guild.get_member(warning["moderator"])
+            moderator = ctx.guild.get_member(warning["moderator"])
             mod_name = moderator.mention if moderator else "Модератор покинул сервер"
             
             embed.add_field(
@@ -233,24 +232,24 @@ class WarningSystem(commands.Cog):
                 inline=False
             )
         
-        await interaction.response.send_message(embed=embed)
+        await (ctx.response.send_message if is_interaction else ctx.send)(embed=embed)
 
-    @app_commands.command(name="warn_clear", description="Очистить все предупреждения участника")
-    @app_commands.checks.has_permissions(kick_members=True)
+    @commands.hybrid_command(name="warn_clear", description="Очистить все предупреждения участника")
+    @commands.has_permissions(kick_members=True)
     @app_commands.describe(member="Участник, чьи предупреждения нужно очистить")
-    async def clear_warnings(self, interaction: discord.Interaction, member: discord.Member):
-        warnings = self.get_user_warnings(interaction.guild.id, member.id)
+    async def clear_warnings(self, ctx: Union[commands.Context, discord.Interaction], member: discord.Member):
+        """Очистить все предупреждения участника."""
+        is_interaction = isinstance(ctx, discord.Interaction)
+        warnings = self.get_user_warnings(ctx.guild.id, member.id)
         
         if not warnings:
-            return await interaction.response.send_message(
-                "У этого участника нет предупреждений",
-                ephemeral=True
-            )
+            response = "У этого участника нет предупреждений"
+            return await (ctx.response.send_message if is_interaction else ctx.send)(response, ephemeral=True)
         
-        self.warnings[str(interaction.guild.id)][str(member.id)] = []
+        self.warnings[str(ctx.guild.id)][str(member.id)] = []
         self.save_warnings()
         
-        await interaction.response.send_message(f"Все предупреждения {member.mention} были удалены")
+        await (ctx.response.send_message if is_interaction else ctx.send)(f"Все предупреждения {member.mention} были удалены")
 
 async def setup(bot):
     await bot.add_cog(WarningSystem(bot)) 

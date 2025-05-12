@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 import leveling_system
 from automod import AutoMod
-from database.db import get_db, get_redis, init_db
+from database.db import get_db, get_redis, init_db, Database
 from image_generator import ImageGenerator
 from logging_system import LoggingSystem
 from moderation import Moderation
@@ -57,8 +57,21 @@ class Bot(commands.Bot):
         """Инициализация бота."""
         super().__init__(command_prefix='!', intents=intents)
         
-    async def setup(self):
-        """Настройка и инициализация модулей бота."""
+        # Инициализация базы данных
+        self.db = Database()
+        
+        # Инициализация модулей
+        self.initial_extensions = [
+            'cogs.events',
+            'cogs.commands',
+            'cogs.admin',
+            'cogs.moderation',
+            'cogs.voice',
+            'cogs.tickets'
+        ]
+        self.use_metrics = os.getenv('USE_METRICS', 'False').lower() == 'true'
+        
+        # Инициализация систем бота
         self.moderation = Moderation(self)
         self.welcome = Welcome(self)
         self.role_rewards = RoleRewards(self)
@@ -70,25 +83,54 @@ class Bot(commands.Bot):
         self.temp_voice = TempVoice(self)
         self.warnings = WarningSystem(self)
         
-        for extension in ['cogs.events', 'cogs.commands']:
-            try:
-                await self.load_extension(extension)
-                logger.info(f"Загружен ког: {extension}")
-            except Exception as e:
-                logger.error(f"Ошибка при загрузке кога {extension}: {str(e)}")
-                capture_error(e)
-        
-        self.cleanup_tasks.start()
-        self.update_metrics.start()
+        # Пул соединений с базой
+        self.db_pool = None
         
     async def setup_hook(self):
-        """Дополнительная настройка при запуске бота."""
-        init_db()
-        
-        start_metrics_server()
-        
-        await self.setup()
-        await self.tree.sync()
+        """Инициализация бота при запуске."""
+        try:
+            # Инициализация базы данных
+            await self.db.setup()
+            
+            # Загрузка когов
+            for extension in self.initial_extensions:
+                try:
+                    await self.load_extension(extension)
+                    logger.info(f"Загружен ког: {extension}")
+                except Exception as e:
+                    logger.error(f"Ошибка при загрузке кога {extension}: {str(e)}")
+                    capture_error(e)
+            
+            # Синхронизация команд с Discord
+            logger.info('Синхронизация команд...')
+            
+            # Синхронизируем команды глобально
+            await self.tree.sync()
+            
+            # Синхронизируем команды для каждого сервера
+            for guild in self.guilds:
+                try:
+                    self.tree.copy_global_to(guild=guild)
+                    await self.tree.sync(guild=guild)
+                    logger.info(f'Команды синхронизированы для сервера: {guild.name}')
+                except Exception as e:
+                    logger.error(f'Ошибка при синхронизации команд для сервера {guild.name}: {str(e)}')
+                    capture_error(e)
+            
+            logger.info('Все команды успешно синхронизированы!')
+            
+            # Запуск фоновых задач
+            self.cleanup_tasks.start()
+            self.update_metrics.start()
+            
+            # Инициализация метрик
+            if self.use_metrics:
+                metrics_port = int(os.getenv('METRICS_PORT', '8000'))
+                start_metrics_server(metrics_port)
+                
+        except Exception as e:
+            logger.error(f"Ошибка в setup_hook: {str(e)}")
+            raise
         
     @tasks.loop(hours=1)
     async def cleanup_tasks(self):
@@ -101,7 +143,14 @@ class Bot(commands.Bot):
             
             redis = get_redis()
             if redis:
-                redis.delete('temp_cache:*')
+                # Используем патерн ключа для очистки временных данных
+                cursor = 0
+                while True:
+                    cursor, keys = redis.scan(cursor, match='temp_cache:*', count=100)
+                    if keys:
+                        redis.delete(*keys)
+                    if cursor == 0:
+                        break
             
         except Exception as e:
             logger.error(f"Error in cleanup tasks: {str(e)}")
@@ -110,12 +159,40 @@ class Bot(commands.Bot):
     @tasks.loop(minutes=5)
     async def update_metrics(self):
         """Обновление метрик бота."""
+        if not self.use_metrics:
+            return
+            
         try:
             total_users = sum(guild.member_count for guild in self.guilds)
             update_active_users(total_users)
         except Exception as e:
             logger.error(f"Error updating metrics: {str(e)}")
             capture_error(e)
+    
+    async def on_message(self, message):
+        """Обработка сообщений.
+        
+        Args:
+            message: Объект сообщения
+        """
+        # Игнорируем сообщения от ботов
+        if message.author.bot:
+            return
+            
+        try:
+            # Трекинг сообщения для метрик
+            track_message()
+            
+            # Обработка сообщения системами бота
+            await self.automod.check_message(message)
+            await self.leveling.process_message(message)
+            
+            # Обработка команд
+            await self.process_commands(message)
+            
+        except Exception as e:
+            logger.error(f"Error in on_message: {str(e)}")
+            capture_error(e, {'event': 'on_message'})
     
     async def on_error(self, event_method, *args, **kwargs):
         """Обработка ошибок событий бота.
@@ -151,17 +228,17 @@ class Bot(commands.Bot):
 
 async def main():
     """Основная функция запуска бота."""
-    async with Bot() as bot:
-        try:
-            load_dotenv()
-            token = os.getenv('DISCORD_TOKEN')
-            if not token:
-                raise ValueError("DISCORD_TOKEN не найден в .env файле")
-            
-            await bot.start(token)
-        except Exception as e:
-            logger.critical(f"Критическая ошибка при запуске бота: {str(e)}")
-            capture_error(e)
+    try:
+        load_dotenv()
+        token = os.getenv('DISCORD_TOKEN')
+        if not token:
+            raise ValueError("DISCORD_TOKEN не найден в .env файле")
+        
+        bot = Bot()
+        await bot.start(token)
+    except Exception as e:
+        logger.critical(f"Критическая ошибка при запуске бота: {str(e)}")
+        capture_error(e)
 
 if __name__ == "__main__":
     asyncio.run(main()) 
