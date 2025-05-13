@@ -1,6 +1,4 @@
 from discord.ext import commands
-import discord
-from utils.monitoring import track_message
 import logging
 
 logger = logging.getLogger(__name__)

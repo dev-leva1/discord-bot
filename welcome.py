@@ -76,5 +76,5 @@ class Welcome:
         # Отправляем сообщение с карточкой
         try:
             await channel.send(file=welcome_card)
-        except:
+        except discord.HTTPException:
             pass 

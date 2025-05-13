@@ -3,12 +3,10 @@
 from discord.ext import commands
 from discord import app_commands
 import discord
-from typing import Optional, Union, List
-import io
-import asyncio
+from typing import Optional
 import logging
 
-from utils.monitoring import monitor_command, track_api_request, measure_api_request_time
+from utils.monitoring import monitor_command
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +123,7 @@ class Commands(commands.Cog):
                 
             await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="help", description="Показывает список доступных команд")
+    @commands.hybrid_command(name="bothelp", description="Показывает список доступных команд")
     @monitor_command
     async def commands_list(self, ctx):
         """Показывает список доступных команд бота.

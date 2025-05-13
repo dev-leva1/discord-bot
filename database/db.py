@@ -2,12 +2,11 @@
 
 import os
 import sqlite3
-import asyncio
 from contextlib import contextmanager, asynccontextmanager
 import redis
 import aiosqlite
 import logging
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger(__name__)
 

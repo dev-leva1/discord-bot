@@ -1,20 +1,17 @@
 """Основной модуль Discord бота."""
 
 import asyncio
-import json
 import logging
 import os
 import sys
-from datetime import datetime
 
 import discord
-from discord import app_commands
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
 import leveling_system
 from automod import AutoMod
-from database.db import get_db, get_redis, init_db, Database
+from database.db import get_db, get_redis, Database
 from image_generator import ImageGenerator
 from logging_system import LoggingSystem
 from moderation import Moderation
@@ -23,7 +20,6 @@ from temp_voice import TempVoice
 from tickets import TicketSystem
 from utils.monitoring import (
     capture_error,
-    monitor_command,
     start_metrics_server,
     track_message,
     update_active_users,
@@ -45,12 +41,12 @@ logger = logging.getLogger(__name__)
 # Настройка интентов Discord
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True
+intents.members = False  # Отключаем привилегированный интент members
 intents.guilds = True
 intents.guild_messages = True
 intents.guild_reactions = True
 intents.voice_states = True
-intents.presences = True
+intents.presences = False  # Отключаем привилегированный интент presences
 intents.moderation = True
 
 class Bot(commands.Bot):
@@ -75,16 +71,22 @@ class Bot(commands.Bot):
         self.use_metrics = os.getenv('USE_METRICS', 'False').lower() == 'true'
         
         # Инициализация систем бота
-        self.moderation = Moderation(self)
-        self.welcome = Welcome(self)
-        self.role_rewards = RoleRewards(self)
-        self.leveling = leveling_system.init_leveling(self)
-        self.automod = AutoMod(self)
-        self.logging = LoggingSystem(self)
-        self.image_generator = ImageGenerator()
-        self.tickets = TicketSystem(self)
-        self.temp_voice = TempVoice(self)
-        self.warnings = WarningSystem(self)
+        try:
+            logger.info("Инициализация модулей бота...")
+            self.moderation = Moderation(self)
+            self.welcome = Welcome(self)
+            self.role_rewards = RoleRewards(self)
+            self.leveling = leveling_system.init_leveling(self)
+            self.automod = AutoMod(self)
+            self.logging = LoggingSystem(self)
+            self.image_generator = ImageGenerator()
+            self.tickets = TicketSystem(self)
+            self.temp_voice = TempVoice(self)
+            self.warnings = WarningSystem(self)
+            logger.info("Все модули бота инициализированы успешно")
+        except Exception as e:
+            logger.error(f"Ошибка при инициализации модулей бота: {str(e)}", exc_info=True)
+            # Продолжаем работу даже при ошибке инициализации некоторых модулей
         
         # Пул соединений с базой
         self.db_pool = None
@@ -119,7 +121,17 @@ class Bot(commands.Bot):
             logger.info('Синхронизация команд...')
             
             try:
-                # Синхронизируем команды глобально
+                # Сначала получаем существующие команды
+                existing_commands = await self.http.get_global_commands(self.application_id)
+                
+                # Находим Entry Point команду, если она существует
+                entry_point_command = next((cmd for cmd in existing_commands if cmd.get('name') == 'entry-point-command'), None)
+                
+                # Синхронизируем команды
+                if entry_point_command is not None:
+                    logger.info('Найдена Entry Point команда, сохраняем ее при синхронизации')
+                    # Здесь можно обработать Entry Point команду, если нужно
+                
                 await self.tree.sync()
                 logger.info('Глобальные команды синхронизированы')
             except Exception as e:
@@ -227,8 +239,11 @@ class Bot(commands.Bot):
             track_message(guild_id)
             
             # Обработка сообщения системами бота
-            await self.automod.check_message(message)
-            await self.leveling.process_message(message)
+            if hasattr(self, 'automod') and self.automod:
+                await self.automod.check_message(message)
+            
+            if hasattr(self, 'leveling') and self.leveling:
+                await self.leveling.process_message(message)
             
             # Обработка команд
             await self.process_commands(message)
