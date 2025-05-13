@@ -142,5 +142,30 @@ class TempVoice(commands.Cog):
         await interaction.user.voice.channel.set_permissions(interaction.guild.default_role, connect=True)
         await interaction.response.send_message("Канал открыт")
 
+    async def cleanup_inactive_channels(self):
+        """Очистка неактивных временных голосовых каналов"""
+        if not self.temp_channels:
+            return
+            
+        # Создаем копию словаря, чтобы избежать ошибок при изменении в цикле
+        temp_channels_copy = self.temp_channels.copy()
+        
+        for channel_id, owner_id in temp_channels_copy.items():
+            channel = self.bot.get_channel(channel_id)
+            if not channel:
+                # Канал был удален, удаляем из словаря
+                if channel_id in self.temp_channels:
+                    del self.temp_channels[channel_id]
+                continue
+                
+            # Проверяем, есть ли пользователи в канале
+            if len(channel.members) == 0:
+                try:
+                    await channel.delete(reason="Автоматическая очистка неактивных каналов")
+                    if channel_id in self.temp_channels:
+                        del self.temp_channels[channel_id]
+                except discord.HTTPException:
+                    pass  # Игнорируем ошибки при удалении канала
+
 async def setup(bot):
     await bot.add_cog(TempVoice(bot)) 

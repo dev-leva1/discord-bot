@@ -123,7 +123,7 @@ class Commands(commands.Cog):
                 
             await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="help", description="Показывает список доступных команд")
+    @commands.hybrid_command(name="bothelp", description="Показывает список доступных команд")
     @monitor_command
     async def commands_list(self, ctx):
         """Показывает список доступных команд бота.
