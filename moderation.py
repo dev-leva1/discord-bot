@@ -1,6 +1,6 @@
 import discord
 from discord import app_commands
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 class Moderation:
     def __init__(self, bot):

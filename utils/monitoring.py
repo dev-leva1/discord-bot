@@ -2,11 +2,10 @@
 
 import sentry_sdk
 from sentry_sdk.integrations.logging import LoggingIntegration
-from prometheus_client import start_http_server, Counter, Gauge, Histogram, Summary
+from prometheus_client import start_http_server, Counter, Gauge, Histogram
 import time
 import os
 import platform
-import sys
 import logging
 import traceback
 from functools import wraps

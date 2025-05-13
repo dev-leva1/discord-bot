@@ -3,12 +3,10 @@
 from discord.ext import commands
 from discord import app_commands
 import discord
-from typing import Optional, Union, List
-import io
-import asyncio
+from typing import Optional
 import logging
 
-from utils.monitoring import monitor_command, track_api_request, measure_api_request_time
+from utils.monitoring import monitor_command
 
 logger = logging.getLogger(__name__)
 

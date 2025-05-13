@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 import json
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
 class WarningSystem(commands.Cog):
     def __init__(self, bot):
@@ -204,7 +204,7 @@ class WarningSystem(commands.Cog):
         removed = warnings.pop(index - 1)
         self.save_warnings()
         
-        await (ctx.response.send_message if is_interaction else ctx.send)(f"Предупреждение #{index} было удалено у {member.mention}")
+        await (ctx.response.send_message if is_interaction else ctx.send)(f"Предупреждение #{index} было удалено у {member.mention}: \"{removed['reason']}\"")
 
     @commands.hybrid_command(name="warn_list", description="Показать список предупреждений участника")
     @app_commands.describe(member="Участник, чьи предупреждения нужно показать")

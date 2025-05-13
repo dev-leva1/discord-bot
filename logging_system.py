@@ -85,7 +85,7 @@ class LoggingSystem:
             
         try:
             await channel.send(embed=embed)
-        except:
+        except discord.HTTPException:
             pass
             
     async def log_message_delete(self, message):

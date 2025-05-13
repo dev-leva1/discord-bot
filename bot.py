@@ -1,20 +1,17 @@
 """Основной модуль Discord бота."""
 
 import asyncio
-import json
 import logging
 import os
 import sys
-from datetime import datetime
 
 import discord
-from discord import app_commands
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
 import leveling_system
 from automod import AutoMod
-from database.db import get_db, get_redis, init_db, Database
+from database.db import get_db, get_redis, Database
 from image_generator import ImageGenerator
 from logging_system import LoggingSystem
 from moderation import Moderation
@@ -23,7 +20,6 @@ from temp_voice import TempVoice
 from tickets import TicketSystem
 from utils.monitoring import (
     capture_error,
-    monitor_command,
     start_metrics_server,
     track_message,
     update_active_users,
