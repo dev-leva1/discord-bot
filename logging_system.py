@@ -85,7 +85,7 @@ class LoggingSystem:
             
         try:
             await channel.send(embed=embed)
-        except:
+        except discord.HTTPException:
             pass
             
     async def log_message_delete(self, message):
@@ -148,11 +148,14 @@ class LoggingSystem:
                 description += f"**Удалены роли:** {', '.join(role.mention for role in removed_roles)}"
                 
             # Получаем информацию о том, кто изменил роли из аудит лога
-            async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
-                if entry.target.id == after.id:
-                    author = entry.user
-                    break
-            else:
+            try:
+                async for entry in after.guild.audit_logs(limit=1, action=discord.AuditLogAction.member_role_update):
+                    if entry.target.id == after.id:
+                        author = entry.user
+                        break
+                else:
+                    author = None
+            except (discord.Forbidden, discord.HTTPException):
                 author = None
                 
             await self.log_event(
@@ -182,12 +185,16 @@ class LoggingSystem:
             
     async def log_ban(self, guild, user):
         # Получаем информацию о том, кто забанил участника
-        async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.ban):
-            if entry.target.id == user.id:
-                author = entry.user
-                reason = entry.reason
-                break
-        else:
+        try:
+            async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.ban):
+                if entry.target.id == user.id:
+                    author = entry.user
+                    reason = entry.reason
+                    break
+            else:
+                author = None
+                reason = "Причина не указана"
+        except (discord.Forbidden, discord.HTTPException):
             author = None
             reason = "Причина не указана"
             
@@ -201,11 +208,14 @@ class LoggingSystem:
         
     async def log_unban(self, guild, user):
         # Получаем информацию о том, кто разбанил участника
-        async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.unban):
-            if entry.target.id == user.id:
-                author = entry.user
-                break
-        else:
+        try:
+            async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.unban):
+                if entry.target.id == user.id:
+                    author = entry.user
+                    break
+            else:
+                author = None
+        except (discord.Forbidden, discord.HTTPException):
             author = None
             
         await self.log_event(

@@ -12,3 +12,5 @@ ENV/
 .idea/
 .DS_Store
 Thumbs.db 
+test_moderation.py
+tests/
