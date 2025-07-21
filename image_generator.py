@@ -101,16 +101,16 @@ class ImageGenerator:
         guild_name: str,
         leaders: list[tuple[discord.User, int, int]]
     ) -> discord.File:
-        """Создание карточки таблицы лидеров.
-        
-        Args:
-            guild_name: Название сервера
-            leaders: Список лидеров (пользователь, уровень, опыт)
-            
-        Returns:
-            discord.File: Сгенерированная карточка
-        """
-        async def generate_leaderboard():
+        """Создание карточки таблицы лидеров."""
+        # Download avatars asynchronously first
+        avatars = []
+        for user, _, _ in leaders:
+            try:
+                avatar = await self.download_avatar(str(user.display_avatar.url))
+            except Exception:
+                avatar = None
+            avatars.append(avatar)
+        def generate_leaderboard():
             height = 200 + (len(leaders) * 100)
             card = Image.new('RGBA', (900, height), (0, 0, 0, 255))
             draw = ImageDraw.Draw(card)
@@ -126,8 +126,8 @@ class ImageGenerator:
                 y = 200 + (i * 100)
                 if i % 2 == 0:
                     draw.rectangle((0, y, 900, y + 90), fill=(20, 20, 20))
-                try:
-                    avatar = await self.download_avatar(str(user.display_avatar.url))
+                avatar = avatars[i]
+                if avatar is not None:
                     avatar = avatar.resize((70, 70))
                     mask = Image.new('L', avatar.size, 0)
                     mask_draw = ImageDraw.Draw(mask)
@@ -138,8 +138,6 @@ class ImageGenerator:
                     avatar_bg_draw.ellipse((0, 0, 80, 80), fill=255)
                     card.paste(avatar_bg, (50, y + 5), avatar_bg_mask)
                     card.paste(avatar, (55, y + 10), mask)
-                except discord.HTTPException:
-                    pass
                 position_text = f"#{i+1}"
                 draw.text((150, y + 30), position_text, fill=(255, 255, 255), font=ImageFont.truetype("arial.ttf", 32))
                 draw.text((250, y + 20), user.name, fill=(255, 255, 255), font=ImageFont.truetype("arial.ttf", 32))
@@ -149,7 +147,7 @@ class ImageGenerator:
             card.save(buffer, format='PNG')
             buffer.seek(0)
             return discord.File(buffer, filename='leaderboard.png')
-        return await asyncio.to_thread(lambda: asyncio.run(generate_leaderboard()))
+        return await asyncio.to_thread(generate_leaderboard)
         
     async def create_welcome_card(
         self,
