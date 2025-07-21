@@ -7,8 +7,9 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Union
 import logging
-
 import discord
+import os
+import pickle
 
 logger = logging.getLogger(__name__)
 
@@ -347,16 +348,31 @@ class LevelingSystem:
             List[Dict[str, Union[str, int]]]: Список лидеров
         """
         guild_id = str(guild_id)
-        
-        # Используем БД если доступна
+        redis_url = os.getenv('REDIS_URL')
+        redis_client = None
+        if redis_url:
+            try:
+                import redis as redis_lib
+                redis_client = redis_lib.from_url(redis_url)
+            except Exception as e:
+                logger.warning(f"Redis unavailable for leaderboard cache: {e}")
+                redis_client = None
+        cache_key = f"leaderboard:{guild_id}:{limit}"
+        if redis_client:
+            cached = redis_client.get(cache_key)
+            if cached:
+                try:
+                    return pickle.loads(cached)
+                except Exception as e:
+                    logger.warning(f"Failed to load cached leaderboard: {e}")
+        # Use DB if available
         if self.use_db:
             try:
                 leaderboard_data = await self.bot.db.fetch_all(
                     "SELECT user_id, xp, level FROM levels WHERE guild_id = ? ORDER BY level DESC, xp DESC LIMIT ?",
                     (int(guild_id), limit)
                 )
-                
-                return [
+                result = [
                     {
                         "user_id": str(row["user_id"]),
                         "xp": row["xp"],
@@ -364,15 +380,19 @@ class LevelingSystem:
                     }
                     for row in leaderboard_data
                 ]
+                if redis_client:
+                    try:
+                        redis_client.setex(cache_key, 60, pickle.dumps(result))
+                    except Exception as e:
+                        logger.warning(f"Failed to cache leaderboard: {e}")
+                return result
             except Exception as e:
                 logger.error(f"Ошибка при получении таблицы лидеров из БД: {e}")
                 # Если произошла ошибка, используем файловую систему
                 self.use_db = False
-        
-        # Используем файловую систему как запасной вариант
+        # Use file system as fallback
         if guild_id not in self.data:
             return []
-            
         users = []
         for user_id, data in self.data[guild_id].items():
             users.append({
@@ -380,7 +400,6 @@ class LevelingSystem:
                 "xp": data["xp"],
                 "level": data["level"]
             })
-            
         return sorted(users, key=lambda x: (x["level"], x["xp"]), reverse=True)[:limit]
 
     async def migrate_to_db(self):

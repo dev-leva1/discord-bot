@@ -55,11 +55,7 @@ class Bot(commands.Bot):
     def __init__(self):
         """Инициализация бота."""
         super().__init__(command_prefix='!', intents=intents)
-        
-        # Инициализация базы данных
         self.db = Database()
-        
-        # Инициализация модулей
         self.initial_extensions = [
             'cogs.events',
             'cogs.commands',
@@ -69,27 +65,78 @@ class Bot(commands.Bot):
             'cogs.tickets'
         ]
         self.use_metrics = os.getenv('USE_METRICS', 'False').lower() == 'true'
-        
-        # Инициализация систем бота
-        try:
-            logger.info("Инициализация модулей бота...")
-            self.moderation = Moderation(self)
-            self.welcome = Welcome(self)
-            self.role_rewards = RoleRewards(self)
-            self.leveling = leveling_system.init_leveling(self)
-            self.automod = AutoMod(self)
-            self.logging = LoggingSystem(self)
-            self.image_generator = ImageGenerator()
-            self.tickets = TicketSystem(self)
-            self.temp_voice = TempVoice(self)
-            self.warnings = WarningSystem(self)
-            logger.info("Все модули бота инициализированы успешно")
-        except Exception as e:
-            logger.error(f"Ошибка при инициализации модулей бота: {str(e)}", exc_info=True)
-            # Продолжаем работу даже при ошибке инициализации некоторых модулей
-        
-        # Пул соединений с базой
+        # Lazy-loaded modules
+        self._moderation = None
+        self._welcome = None
+        self._role_rewards = None
+        self._leveling = None
+        self._automod = None
+        self._logging = None
+        self._image_generator = None
+        self._tickets = None
+        self._temp_voice = None
+        self._warnings = None
         self.db_pool = None
+
+    @property
+    def moderation(self):
+        if self._moderation is None:
+            self._moderation = Moderation(self)
+        return self._moderation
+
+    @property
+    def welcome(self):
+        if self._welcome is None:
+            self._welcome = Welcome(self)
+        return self._welcome
+
+    @property
+    def role_rewards(self):
+        if self._role_rewards is None:
+            self._role_rewards = RoleRewards(self)
+        return self._role_rewards
+
+    @property
+    def leveling(self):
+        if self._leveling is None:
+            self._leveling = leveling_system.init_leveling(self)
+        return self._leveling
+
+    @property
+    def automod(self):
+        if self._automod is None:
+            self._automod = AutoMod(self)
+        return self._automod
+
+    @property
+    def logging(self):
+        if self._logging is None:
+            self._logging = LoggingSystem(self)
+        return self._logging
+
+    @property
+    def image_generator(self):
+        if self._image_generator is None:
+            self._image_generator = ImageGenerator()
+        return self._image_generator
+
+    @property
+    def tickets(self):
+        if self._tickets is None:
+            self._tickets = TicketSystem(self)
+        return self._tickets
+
+    @property
+    def temp_voice(self):
+        if self._temp_voice is None:
+            self._temp_voice = TempVoice(self)
+        return self._temp_voice
+
+    @property
+    def warnings(self):
+        if self._warnings is None:
+            self._warnings = WarningSystem(self)
+        return self._warnings
         
     async def setup_hook(self):
         """Инициализация бота при запуске."""
