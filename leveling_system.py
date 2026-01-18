@@ -465,10 +465,7 @@ def init_leveling(bot) -> LevelingSystem:
     """
     global leveling
     leveling = LevelingSystem(bot)
-    
-    # Запускаем миграцию из файла в БД если необходимо
-    asyncio.create_task(leveling.migrate_to_db())
-    
+
     return leveling
 
 async def add_experience(

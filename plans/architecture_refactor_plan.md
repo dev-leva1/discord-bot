@@ -4,8 +4,8 @@
 
 ## Текущее положение
 
-- Точка входа и оркестрация в [`bot.py`](../bot.py:1)
-- Команды частично в когах ([`cogs/commands.py`](../cogs/commands.py:1), [`cogs/events.py`](../cogs/events.py:1)), частично в сервисах через `bot.tree` ([`automod.py`](../automod.py:1), [`moderation.py`](../moderation.py:1))
+- Точка входа и оркестрация в [`app/bot.py`](../app/bot.py:1) с совместимым re-export через [`bot.py`](../bot.py:1)
+- Команды частично в когах ([`cogs/commands.py`](../cogs/commands.py:1), [`cogs/events.py`](../cogs/events.py:1)), частично в новых когах presentation ([`presentation/automod.py`](../presentation/automod.py:1), [`presentation/moderation.py`](../presentation/moderation.py:1))
 - Данные в разрозненных источниках: SQLite через [`database/db.py`](../database/db.py:1), JSON-конфиги ([`automod.py`](../automod.py:1), [`tickets.py`](../tickets.py:1))
 - Инициализация мониторинга на уровне импорта ([`utils/monitoring.py`](../utils/monitoring.py:1))
 
@@ -55,13 +55,13 @@ mee6/
 ## TODO план по этапам
 
 ### Этап 1. Базовая структура и DI
-- [ ] Создать пакеты `app`, `presentation`, `application`, `domain`, `infrastructure`.
-- [ ] Вынести запуск бота в [`app/bot.py`](../bot.py:1) и добавить контейнер зависимостей в [`app/container.py`](../bot.py:1).
-- [ ] Перевести ленивые свойства `Bot` на явную инициализацию через контейнер.
+- [x] Создать пакеты `app`, `presentation`, `application`, `domain`, `infrastructure`.
+- [x] Вынести запуск бота в [`app/bot.py`](../app/bot.py:1) и добавить контейнер зависимостей в [`app/container.py`](../app/container.py:1).
+- [x] Перевести ленивые свойства `Bot` на явную инициализацию через контейнер.
 
 ### Этап 2. Команды только в когах
-- [ ] Перенести регистрацию команд из [`automod.py`](../automod.py:1) и [`moderation.py`](../moderation.py:1) в коги `presentation`.
-- [ ] Сервисы оставить чистыми: без `bot.tree` и без `discord.Interaction`.
+- [x] Перенести регистрацию команд из [`automod.py`](../automod.py:1) и [`moderation.py`](../moderation.py:1) в коги `presentation`.
+- [x] Сервисы оставить чистыми: без `bot.tree` и без `discord.Interaction`.
 
 ### Этап 3. Единый слой данных
 - [ ] Ввести репозитории (LevelsRepository, TicketsRepository, WarningsRepository).
@@ -79,6 +79,6 @@ mee6/
 
 ## Риски и меры
 
-- Риск: разрыв старых импортов. Мера: временные адаптеры и re-export модули.
+- Риск: разрыв старых импортов. Мера: временные адаптеры и re-export модули (сейчас: [`bot.py`](../bot.py:1), [`moderation.py`](../moderation.py:1)).
 - Риск: расхождение данных JSON и SQLite. Мера: однонаправленная миграция при старте.
 

@@ -1,6 +1,13 @@
-import discord
-from discord import app_commands
-from datetime import timedelta
+"""Совместимый модуль модерации (команды перенесены в presentation слой)."""
+
+from presentation.moderation import ModerationCog
+
+
+__all__ = ["ModerationCog"]
+
+
+# Backward compatibility alias
+Moderation = ModerationCog
 
 class Moderation:
     def __init__(self, bot):
