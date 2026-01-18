@@ -33,11 +33,13 @@ class TicketSystem(commands.Cog, TicketsServiceContract):
 
     @app_commands.command(name="ticket_setup", description="Настроить систему тикетов")
     @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(
-        category="Категория для тикетов",
-        support_role="Роль поддержки"
-    )
-    async def setup_tickets(self, interaction: discord.Interaction, category: discord.CategoryChannel, support_role: discord.Role):
+    @app_commands.describe(category="Категория для тикетов", support_role="Роль поддержки")
+    async def setup_tickets(
+        self,
+        interaction: discord.Interaction,
+        category: discord.CategoryChannel,
+        support_role: discord.Role,
+    ):
         self.tickets_config["ticket_category"] = category.id
         self.tickets_config["support_role"] = support_role.id
         self.save_config()
@@ -51,33 +53,32 @@ class TicketSystem(commands.Cog, TicketsServiceContract):
         if not self.tickets_config["ticket_category"]:
             return await interaction.response.send_message(
                 "Система тикетов не настроена! Администратор должен выполнить команду /ticket_setup",
-                ephemeral=True
+                ephemeral=True,
             )
 
         self.tickets_config["ticket_counter"] += 1
         ticket_number = self.tickets_config["ticket_counter"]
-        
+
         category = self.bot.get_channel(self.tickets_config["ticket_category"])
         support_role = interaction.guild.get_role(self.tickets_config["support_role"])
 
         overwrites = {
             interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-            support_role: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+            support_role: discord.PermissionOverwrite(read_messages=True, send_messages=True),
         }
 
         channel = await category.create_text_channel(
-            f"ticket-{ticket_number}",
-            overwrites=overwrites
+            f"ticket-{ticket_number}", overwrites=overwrites
         )
 
         embed = discord.Embed(
             title=f"Тикет #{ticket_number}",
             description=f"**Причина:** {reason}\n**Создатель:** {interaction.user.mention}",
             color=discord.Color.blue(),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
-        
+
         await channel.send(f"{support_role.mention}", embed=embed)
         if self.repository:
             await self.repository.create_ticket(
@@ -94,8 +95,7 @@ class TicketSystem(commands.Cog, TicketsServiceContract):
     async def close_ticket(self, interaction: discord.Interaction):
         if not interaction.channel.name.startswith("ticket-"):
             return await interaction.response.send_message(
-                "Эта команда может быть использована только в каналах тикетов!",
-                ephemeral=True
+                "Эта команда может быть использована только в каналах тикетов!", ephemeral=True
             )
 
         await interaction.response.send_message("Тикет будет закрыт через 5 секунд...")
@@ -104,5 +104,6 @@ class TicketSystem(commands.Cog, TicketsServiceContract):
             await self.repository.close_ticket(interaction.channel.id)
         await interaction.channel.delete()
 
+
 async def setup(bot):
-    await bot.add_cog(TicketSystem(bot)) 
+    await bot.add_cog(TicketSystem(bot))

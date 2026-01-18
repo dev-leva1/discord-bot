@@ -31,9 +31,7 @@ class AutoModCog(commands.Cog):
                     ephemeral=True,
                 )
             else:
-                await interaction.response.send_message(
-                    "Это слово уже в списке", ephemeral=True
-                )
+                await interaction.response.send_message("Это слово уже в списке", ephemeral=True)
 
         elif action == "removeword" and value:
             if value in automod_service.config["banned_words"]:
@@ -44,9 +42,7 @@ class AutoModCog(commands.Cog):
                     ephemeral=True,
                 )
             else:
-                await interaction.response.send_message(
-                    "Этого слова нет в списке", ephemeral=True
-                )
+                await interaction.response.send_message("Этого слова нет в списке", ephemeral=True)
 
         elif action == "listwords":
             if automod_service.config["banned_words"]:
@@ -158,4 +154,3 @@ class AutoModCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(AutoModCog(bot))
-

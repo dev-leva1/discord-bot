@@ -5,9 +5,10 @@ from datetime import datetime
 
 Base = declarative_base()
 
+
 class User(Base):
-    __tablename__ = 'users'
-    
+    __tablename__ = "users"
+
     id = Column(BigInteger, primary_key=True)
     guild_id = Column(BigInteger)
     xp = Column(Integer, default=0)
@@ -16,11 +17,12 @@ class User(Base):
     warnings = relationship("Warning", back_populates="user")
     voice_channels = relationship("VoiceChannel", back_populates="owner")
 
+
 class Warning(Base):
-    __tablename__ = 'warnings'
-    
+    __tablename__ = "warnings"
+
     id = Column(Integer, primary_key=True)
-    user_id = Column(BigInteger, ForeignKey('users.id'))
+    user_id = Column(BigInteger, ForeignKey("users.id"))
     guild_id = Column(BigInteger)
     moderator_id = Column(BigInteger)
     reason = Column(String)
@@ -29,21 +31,23 @@ class Warning(Base):
     active = Column(Boolean, default=True)
     user = relationship("User", back_populates="warnings")
 
+
 class VoiceChannel(Base):
-    __tablename__ = 'voice_channels'
-    
+    __tablename__ = "voice_channels"
+
     id = Column(BigInteger, primary_key=True)
     guild_id = Column(BigInteger)
-    owner_id = Column(BigInteger, ForeignKey('users.id'))
+    owner_id = Column(BigInteger, ForeignKey("users.id"))
     name = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     limit = Column(Integer, nullable=True)
     locked = Column(Boolean, default=False)
     owner = relationship("User", back_populates="voice_channels")
 
+
 class GuildConfig(Base):
-    __tablename__ = 'guild_configs'
-    
+    __tablename__ = "guild_configs"
+
     guild_id = Column(BigInteger, primary_key=True)
     welcome_channel_id = Column(BigInteger, nullable=True)
     log_channel_id = Column(BigInteger, nullable=True)
@@ -51,4 +55,4 @@ class GuildConfig(Base):
     voice_category_id = Column(BigInteger, nullable=True)
     automod_enabled = Column(Boolean, default=True)
     max_warnings = Column(Integer, default=3)
-    warning_expire_days = Column(Integer, default=30) 
+    warning_expire_days = Column(Integer, default=30)

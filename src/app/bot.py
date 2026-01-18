@@ -113,9 +113,7 @@ class Bot(commands.Bot):
                     await self.add_cog(cog_factory(self))
                     logger.info(f"Загружен ког: {cog_factory.__name__}")
                 except Exception as e:
-                    logger.error(
-                        f"Ошибка при загрузке кога {cog_factory.__name__}: {str(e)}"
-                    )
+                    logger.error(f"Ошибка при загрузке кога {cog_factory.__name__}: {str(e)}")
                     capture_error(e)
 
             # Синхронизация команд с Discord
@@ -123,25 +121,17 @@ class Bot(commands.Bot):
 
             try:
                 # Сначала получаем существующие команды
-                existing_commands = await self.http.get_global_commands(
-                    self.application_id
-                )
+                existing_commands = await self.http.get_global_commands(self.application_id)
 
                 # Находим Entry Point команду, если она существует
                 entry_point_command = next(
-                    (
-                        cmd
-                        for cmd in existing_commands
-                        if cmd.get("name") == "entry-point-command"
-                    ),
+                    (cmd for cmd in existing_commands if cmd.get("name") == "entry-point-command"),
                     None,
                 )
 
                 # Синхронизируем команды
                 if entry_point_command is not None:
-                    logger.info(
-                        "Найдена Entry Point команда, сохраняем ее при синхронизации"
-                    )
+                    logger.info("Найдена Entry Point команда, сохраняем ее при синхронизации")
 
                 await self.tree.sync()
                 logger.info("Глобальные команды синхронизированы")
@@ -177,17 +167,13 @@ class Bot(commands.Bot):
 
             # Инициализация метрик
             if self.use_metrics:
-                logger.info(
-                    f"Запуск сервера метрик на порту {self.container.metrics_port}..."
-                )
+                logger.info(f"Запуск сервера метрик на порту {self.container.metrics_port}...")
                 start_metrics_server(self.container.metrics_port)
 
             logger.info("Инициализация бота завершена успешно!")
 
         except Exception as e:
-            logger.error(
-                f"Критическая ошибка в setup_hook: {str(e)}", exc_info=True
-            )
+            logger.error(f"Критическая ошибка в setup_hook: {str(e)}", exc_info=True)
             raise
 
     @tasks.loop(hours=1)
@@ -219,9 +205,7 @@ class Bot(commands.Bot):
                         deleted_keys += len(keys)
                     if cursor == 0:
                         break
-                logger.debug(
-                    f"Очистка кэша Redis выполнена, удалено {deleted_keys} ключей"
-                )
+                logger.debug(f"Очистка кэша Redis выполнена, удалено {deleted_keys} ключей")
 
             logger.debug("Задача очистки временных данных завершена")
 
@@ -366,14 +350,10 @@ async def main() -> None:
 
     except discord.errors.LoginFailure as e:
         logger.critical(f"Ошибка авторизации в Discord: {str(e)}")
-        logger.critical(
-            "Пожалуйста, проверьте правильность токена Discord в файле .env"
-        )
+        logger.critical("Пожалуйста, проверьте правильность токена Discord в файле .env")
         sys.exit(1)
     except Exception as e:
-        logger.critical(
-            f"Критическая ошибка при запуске бота: {str(e)}", exc_info=True
-        )
+        logger.critical(f"Критическая ошибка при запуске бота: {str(e)}", exc_info=True)
         capture_error(e)
         sys.exit(1)
 
@@ -386,4 +366,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.critical(f"Необработанная ошибка: {str(e)}", exc_info=True)
         sys.exit(1)
-

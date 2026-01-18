@@ -29,8 +29,7 @@ class ModerationCog(commands.Cog):
         embed = discord.Embed(
             title="Бан участника",
             description=(
-                f"Участник {member.mention} был забанен\n"
-                f"Причина: {reason or 'Не указана'}"
+                f"Участник {member.mention} был забанен\nПричина: {reason or 'Не указана'}"
             ),
             color=discord.Color.red(),
         )
@@ -55,8 +54,7 @@ class ModerationCog(commands.Cog):
         embed = discord.Embed(
             title="Кик участника",
             description=(
-                f"Участник {member.mention} был выгнан\n"
-                f"Причина: {reason or 'Не указана'}"
+                f"Участник {member.mention} был выгнан\nПричина: {reason or 'Не указана'}"
             ),
             color=discord.Color.orange(),
         )
@@ -130,4 +128,3 @@ class ModerationCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(ModerationCog(bot))
-

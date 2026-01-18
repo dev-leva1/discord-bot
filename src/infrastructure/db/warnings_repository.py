@@ -37,9 +37,7 @@ class WarningsRepository(WarningsRepositoryContract):
             ),
         )
 
-    async def list_warnings(
-        self, guild_id: int, user_id: int
-    ) -> List[Dict[str, str]]:
+    async def list_warnings(self, guild_id: int, user_id: int) -> List[Dict[str, str]]:
         return await self._db.fetch_all(
             "SELECT id, reason, issued_by, issued_at FROM warnings WHERE guild_id = ? AND user_id = ? ORDER BY issued_at ASC",
             (guild_id, user_id),

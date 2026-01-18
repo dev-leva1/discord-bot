@@ -1,11 +1,8 @@
 import pytest
 from discord.ext import commands
-import discord
-import asyncio
 from bot import Bot
 from database.models import User, Warning, GuildConfig
 from database.db import get_db
-import os
 from dotenv import load_dotenv
 
 load_dotenv()

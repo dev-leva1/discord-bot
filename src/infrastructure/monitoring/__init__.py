@@ -17,4 +17,3 @@ def init_monitoring() -> None:
     environment = os.getenv("ENVIRONMENT", "production")
     init_sentry(dsn, environment)
     logger.info("Мониторинг инициализирован")
-

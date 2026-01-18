@@ -16,9 +16,7 @@ class LevelsRepository(LevelsRepositoryContract):
     def __init__(self, db: Database) -> None:
         self._db = db
 
-    async def get_user_level_xp(
-        self, user_id: int, guild_id: int
-    ) -> Optional[Dict[str, int]]:
+    async def get_user_level_xp(self, user_id: int, guild_id: int) -> Optional[Dict[str, int]]:
         return await self._db.fetch_one(
             "SELECT xp, level FROM levels WHERE user_id = ? AND guild_id = ?",
             (user_id, guild_id),
@@ -54,15 +52,11 @@ class LevelsRepository(LevelsRepositoryContract):
         table_info = await self._db.fetch_all("PRAGMA table_info(levels)")
         columns = [col["name"] for col in table_info]
         if "last_message_time" not in columns:
-            await self._db.execute(
-                "ALTER TABLE levels ADD COLUMN last_message_time TIMESTAMP"
-            )
+            await self._db.execute("ALTER TABLE levels ADD COLUMN last_message_time TIMESTAMP")
             return True
         return False
 
-    async def get_leaderboard(
-        self, guild_id: int, limit: int
-    ) -> List[Dict[str, int]]:
+    async def get_leaderboard(self, guild_id: int, limit: int) -> List[Dict[str, int]]:
         leaderboard_data = await self._db.fetch_all(
             "SELECT user_id, xp, level FROM levels WHERE guild_id = ? ORDER BY level DESC, xp DESC LIMIT ?",
             (guild_id, limit),
