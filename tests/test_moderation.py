@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock, AsyncMock
 import discord
-from moderation import Moderation
+from src.moderation import Moderation
 
 class TestModerationCommands(unittest.TestCase):
     def setUp(self):

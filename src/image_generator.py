@@ -14,7 +14,7 @@ class ImageGenerator:
     
     def __init__(self):
         """Инициализация генератора изображений."""
-        self.font_path = "fonts"
+        self.font_path = os.path.join("assets", "fonts")
         os.makedirs(self.font_path, exist_ok=True)
         
     async def download_avatar(self, avatar_url: str) -> Image.Image:

@@ -9,7 +9,7 @@ from application.contracts import LoggingServiceContract
 class LoggingSystem(LoggingServiceContract):
     def __init__(self, bot):
         self.bot = bot
-        self.config_file = Path("logging_config.json")
+        self.config_file = Path("data") / "logging_config.json"
         self.load_config()
         
     def load_config(self):

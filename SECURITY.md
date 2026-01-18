@@ -1,19 +1,13 @@
 # Security Policy
 
-## Supported Versions
+## Поддерживаемые версии
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Мы поддерживаем последнюю минорную версию на ветке `main`.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
-| 1.1.x   | :white_check_mark: |
+## Сообщить об уязвимости
 
-## Reporting a Vulnerability
+- Не создавайте публичные issue.
+- Отправьте сообщение ответственному через Discord: `leva1`.
+- Укажите шаги воспроизведения, предполагаемую степень риска и возможные меры.
 
-Use this section to tell people how to report a vulnerability.
-
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Мы подтвердим получение и дадим обратную связь после первичной проверки.

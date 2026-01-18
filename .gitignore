@@ -1,5 +1,5 @@
 
-.env
+data/
 *.json
 __pycache__/
 *.py[cod]
@@ -7,10 +7,12 @@ __pycache__/
 venv/
 env/
 ENV/
+.venv/
 *.log
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db 
-test_moderation.py
-tests/
+tests/__pycache__/
+bot.log
+*.db

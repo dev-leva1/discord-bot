@@ -6,7 +6,7 @@ from pathlib import Path
 class Welcome:
     def __init__(self, bot):
         self.bot = bot
-        self.config_file = Path("welcome_config.json")
+        self.config_file = Path("data") / "welcome_config.json"
         self.load_config()
         
     def load_config(self):

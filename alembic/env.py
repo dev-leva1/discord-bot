@@ -6,8 +6,8 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Добавляем путь к корню проекта
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+# Добавляем путь к src
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 
 from database.models import Base
 from database.db import DATABASE_URL

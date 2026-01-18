@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from dataclasses import dataclass
 
 import leveling_system
@@ -56,6 +57,7 @@ class Container:
 
     def __init__(self) -> None:
         init_monitoring()
+        os.environ.setdefault("DB_PATH", str(Path("data") / "bot.db"))
         self.use_metrics = os.getenv("USE_METRICS", "False").lower() == "true"
         self.metrics_port = int(os.getenv("METRICS_PORT", "8000"))
         self.db = Database()

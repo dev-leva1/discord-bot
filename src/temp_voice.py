@@ -2,10 +2,12 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import json
+from pathlib import Path
 
 class TempVoice(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.config_path = Path("data") / "voice_config.json"
         self.voice_config = self.load_config()
         self.temp_channels = {}
 
@@ -15,20 +17,22 @@ class TempVoice(commands.Cog):
 
     def load_config(self):
         try:
-            with open('voice_config.json', 'r') as f:
+            with self.config_path.open("r", encoding="utf-8") as f:
                 return json.load(f)
         except FileNotFoundError:
             default_config = {
                 "creation_channel": None,
                 "temp_category": None
             }
-            with open('voice_config.json', 'w') as f:
-                json.dump(default_config, f, indent=4)
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.config_path.open("w", encoding="utf-8") as f:
+                json.dump(default_config, f, indent=4, ensure_ascii=False)
             return default_config
 
     def save_config(self):
-        with open('voice_config.json', 'w') as f:
-            json.dump(self.voice_config, f, indent=4)
+        self.config_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.config_path.open("w", encoding="utf-8") as f:
+            json.dump(self.voice_config, f, indent=4, ensure_ascii=False)
 
     @app_commands.command(name="voice_setup", description="Настроить систему временных голосовых каналов")
     @app_commands.checks.has_permissions(administrator=True)

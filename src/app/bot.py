@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import sys
+from pathlib import Path
 
 import discord
 from discord.ext import commands, tasks
@@ -30,11 +31,15 @@ from application.contracts import (
 )
 
 
+log_dir = Path("data") / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+log_file = log_dir / "bot.log"
+
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("bot.log"), logging.StreamHandler()],
+    handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
 
@@ -88,7 +93,11 @@ class Bot(commands.Bot):
             for extension in self.initial_extensions:
                 try:
                     # Проверяем существование файла кога
-                    cog_path = extension.replace(".", "/") + ".py"
+                    cog_path = os.path.join(
+                        os.path.dirname(__file__),
+                        "..",
+                        extension.replace(".", "/") + ".py",
+                    )
                     if not os.path.exists(cog_path):
                         logger.warning(f"Файл кога {cog_path} не найден, пропускаем")
                         continue
@@ -339,7 +348,7 @@ async def main() -> None:
     """Основная функция запуска бота."""
     try:
         # Загрузка переменных окружения
-        load_dotenv()
+        load_dotenv(Path("data") / ".env")
         logger.info("Загружены переменные окружения")
 
         # Проверка обязательных переменных окружения

@@ -15,8 +15,8 @@ class Database:
     
     def __init__(self):
         """Инициализация подключения к базе данных."""
-        self.db_path = 'bot.db'
-        self.redis_url = os.getenv('REDIS_URL')
+        self.db_path = os.getenv("DB_PATH", os.path.join("data", "bot.db"))
+        self.redis_url = os.getenv("REDIS_URL")
         self.redis = None
         self.pool = None
         self.pool_size = int(os.getenv('DB_POOL_SIZE', '5'))
@@ -259,7 +259,8 @@ def get_db():
     """Контекстный менеджер для работы с SQLite."""
     conn = None
     try:
-        conn = sqlite3.connect('bot.db')
+        db_path = os.getenv("DB_PATH", os.path.join("data", "bot.db"))
+        conn = sqlite3.connect(db_path)
         yield conn
     except Exception as e:
         logger.error(f"Ошибка при работе с базой данных: {e}")
@@ -272,7 +273,7 @@ def get_db():
 
 def get_redis():
     """Получение подключения к Redis."""
-    redis_url = os.getenv('REDIS_URL')
+    redis_url = os.getenv("REDIS_URL")
     if redis_url:
         try:
             redis_client = redis.from_url(redis_url)

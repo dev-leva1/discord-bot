@@ -32,6 +32,14 @@
   - Настраиваемый канал приветствий
   - Красивые карточки приветствия
 
+## Быстрые ссылки
+
+- Документация: [docs/overview.md](docs/overview.md:1)
+- Установка: [docs/setup.md](docs/setup.md:1)
+- Конфигурация: [docs/configuration.md](docs/configuration.md:1)
+- FAQ: [docs/faq.md](docs/faq.md:1)
+- Миграция: [docs/migration.md](docs/migration.md:1)
+
 ## Установка и запуск
 
 ### Предварительные требования
@@ -50,10 +58,10 @@
 
 2. Установите зависимости:
    ```
-   pip install -r requirements.txt
+   uv pip install -e .[dev]
    ```
 
-3. Создайте файл `.env` в корневой директории проекта:
+3. Создайте файл `data/.env`:
    ```
    # Discord Bot Token
    DISCORD_TOKEN=your_discord_token_here
@@ -84,7 +92,7 @@
 
 2. Запустите контейнер:
    ```
-   docker run -d --name discord-bot --env-file .env discord-bot
+   docker run -d --name discord-bot --env-file data/.env discord-bot
    ```
 
 ## Команды
@@ -147,24 +155,20 @@
 
 ```
 mee6/
-├── alembic/           # Миграции базы данных
-├── cogs/              # Модули команд и событий
-│   ├── admin.py
-│   ├── commands.py
-│   ├── events.py
-│   ├── moderation.py
-│   ├── tickets.py
-│   └── voice.py
-├── database/          # Работа с базой данных
-│   └── db.py
-├── utils/             # Утилиты
-│   ├── monitoring.py
-│   └── ... 
-├── .env               # Переменные окружения
-├── bot.py             # Основной файл бота
-├── leveling_system.py # Система уровней
-├── moderation.py      # Система модерации
-└── ... 
+├── .github/           # Шаблоны и CI
+├── alembic/           # Миграции БД
+├── assets/            # Шрифты и ресурсы
+├── data/              # .env, JSON конфиги, база
+├── docs/              # Документация
+├── src/               # Исходный код
+│   ├── app/
+│   ├── application/
+│   ├── cogs/
+│   ├── infrastructure/
+│   └── ...
+├── tests/             # Тесты
+├── bot.py             # Точка входа
+└── pyproject.toml      # Зависимости и метаданные
 ```
 
 ## Лицензия

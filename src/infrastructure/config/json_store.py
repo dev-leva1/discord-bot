@@ -14,7 +14,8 @@ class JsonStore(Generic[T]):
     """Хранилище JSON с ленивым созданием по умолчанию."""
 
     def __init__(self, path: str, default_factory: Callable[[], T]) -> None:
-        self.path = Path(path)
+        base_dir = Path("data")
+        self.path = base_dir / path
         self.default_factory = default_factory
 
     def load(self) -> T:
