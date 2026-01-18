@@ -81,6 +81,9 @@ class ModerationCog(commands.Cog):
             duration_value = int(duration[:-1])
             duration_unit = duration[-1].lower()
 
+            if duration_value <= 0:
+                raise ValueError
+
             if duration_unit == "m":
                 delta = timedelta(minutes=duration_value)
             elif duration_unit == "h":
