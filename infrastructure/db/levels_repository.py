@@ -7,8 +7,10 @@ from typing import Dict, List, Optional
 
 from database.db import Database
 
+from application.contracts import LevelsRepositoryContract
 
-class LevelsRepository:
+
+class LevelsRepository(LevelsRepositoryContract):
     """Доступ к данным уровней в БД."""
 
     def __init__(self, db: Database) -> None:

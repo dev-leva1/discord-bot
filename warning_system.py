@@ -7,13 +7,14 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Union
 
 from infrastructure.config import WarningsConfigStore, WarningsStore
-from infrastructure.db import WarningsRepository
 
-class WarningSystem(commands.Cog):
+from application.contracts import WarningsRepositoryContract, WarningsServiceContract
+
+class WarningSystem(commands.Cog, WarningsServiceContract):
     def __init__(
         self,
         bot,
-        repository: WarningsRepository | None = None,
+        repository: WarningsRepositoryContract | None = None,
         store: WarningsStore | None = None,
         config_store: WarningsConfigStore | None = None,
     ):

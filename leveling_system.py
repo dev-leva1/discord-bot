@@ -10,17 +10,18 @@ import os
 import pickle
 
 from infrastructure.config import LevelsStore
-from infrastructure.db import LevelsRepository
+
+from application.contracts import LevelingServiceContract, LevelsRepositoryContract
 
 logger = logging.getLogger(__name__)
 
-class LevelingSystem:
+class LevelingSystem(LevelingServiceContract):
     """Класс для управления системой уровней."""
     
     def __init__(
         self,
         bot,
-        repository: LevelsRepository,
+        repository: LevelsRepositoryContract,
         store: LevelsStore,
     ):
         """Инициализация системы уровней.
@@ -374,7 +375,7 @@ leveling: Optional[LevelingSystem] = None
 
 def init_leveling(
     bot,
-    repository: LevelsRepository,
+    repository: LevelsRepositoryContract,
     store: LevelsStore,
 ) -> LevelingSystem:
     """Инициализация системы уровней.

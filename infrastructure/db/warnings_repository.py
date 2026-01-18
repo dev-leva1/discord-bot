@@ -7,8 +7,10 @@ from typing import Dict, List, Optional
 
 from database.db import Database
 
+from application.contracts import WarningsRepositoryContract
 
-class WarningsRepository:
+
+class WarningsRepository(WarningsRepositoryContract):
     """Доступ к данным предупреждений в БД."""
 
     def __init__(self, db: Database) -> None:

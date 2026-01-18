@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-class LoggingSystem:
+from application.contracts import LoggingServiceContract
+
+class LoggingSystem(LoggingServiceContract):
     def __init__(self, bot):
         self.bot = bot
         self.config_file = Path("logging_config.json")

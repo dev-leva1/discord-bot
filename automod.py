@@ -7,7 +7,9 @@ import discord
 
 from infrastructure.config import AutomodConfigStore
 
-class AutoMod:
+from application.contracts import AutomodServiceContract
+
+class AutoMod(AutomodServiceContract):
     """Класс для управления автомодерацией на сервере."""
     
     def __init__(self, bot, store: AutomodConfigStore | None = None):

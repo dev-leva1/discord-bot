@@ -7,8 +7,10 @@ from typing import Dict, Optional
 
 from database.db import Database
 
+from application.contracts import TicketsRepositoryContract
 
-class TicketsRepository:
+
+class TicketsRepository(TicketsRepositoryContract):
     """Доступ к данным тикетов в БД."""
 
     def __init__(self, db: Database) -> None:

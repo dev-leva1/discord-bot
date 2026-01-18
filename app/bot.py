@@ -21,6 +21,14 @@ from utils.monitoring import (
 
 from app.container import Container
 
+from application.contracts import (
+    AutomodServiceContract,
+    LevelingServiceContract,
+    LoggingServiceContract,
+    TicketsServiceContract,
+    WarningsServiceContract,
+)
+
 
 # Настройка логирования
 logging.basicConfig(
@@ -57,12 +65,12 @@ class Bot(commands.Bot):
         self.moderation = services.moderation
         self.welcome = services.welcome
         self.role_rewards = services.role_rewards
-        self.leveling = services.leveling
-        self.automod = services.automod
-        self.logging = services.logging
-        self.tickets = services.tickets
+        self.leveling: LevelingServiceContract = services.leveling
+        self.automod: AutomodServiceContract = services.automod
+        self.logging: LoggingServiceContract = services.logging
+        self.tickets: TicketsServiceContract = services.tickets
         self.temp_voice = services.temp_voice
-        self.warnings = services.warnings
+        self.warnings: WarningsServiceContract = services.warnings
         self.db_pool = None
 
     async def setup_hook(self) -> None:

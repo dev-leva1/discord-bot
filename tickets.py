@@ -5,10 +5,17 @@ import asyncio
 from datetime import datetime
 
 from infrastructure.config import TicketsConfigStore
-from infrastructure.db import TicketsRepository
 
-class TicketSystem(commands.Cog):
-    def __init__(self, bot, repository: TicketsRepository | None = None, store: TicketsConfigStore | None = None):
+from application.contracts import TicketsRepositoryContract, TicketsServiceContract
+
+
+class TicketSystem(commands.Cog, TicketsServiceContract):
+    def __init__(
+        self,
+        bot,
+        repository: TicketsRepositoryContract | None = None,
+        store: TicketsConfigStore | None = None,
+    ):
         self.bot = bot
         self.repository = repository
         self.store = store or TicketsConfigStore()

@@ -27,6 +27,14 @@ from infrastructure.config import (
 from infrastructure.monitoring import init_monitoring
 from infrastructure.db import LevelsRepository, TicketsRepository, WarningsRepository
 
+from application.contracts import (
+    AutomodServiceContract,
+    LevelingServiceContract,
+    LoggingServiceContract,
+    TicketsServiceContract,
+    WarningsServiceContract,
+)
+
 
 @dataclass(frozen=True)
 class BotServices:
@@ -35,12 +43,12 @@ class BotServices:
     moderation: Moderation
     welcome: Welcome
     role_rewards: RoleRewards
-    leveling: leveling_system.LevelingSystem
-    automod: AutoMod
-    logging: LoggingSystem
-    tickets: TicketSystem
+    leveling: LevelingServiceContract
+    automod: AutomodServiceContract
+    logging: LoggingServiceContract
+    tickets: TicketsServiceContract
     temp_voice: TempVoice
-    warnings: WarningSystem
+    warnings: WarningsServiceContract
 
 
 class Container:
