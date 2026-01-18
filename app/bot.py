@@ -150,6 +150,9 @@ class Bot(commands.Bot):
             if self.leveling:
                 await self.leveling.migrate_to_db()
 
+            if self.warnings:
+                await self.warnings.migrate_to_db()
+
             # Запуск фоновых задач
             logger.info("Запуск фоновых задач...")
             self.cleanup_tasks.start()
@@ -178,7 +181,7 @@ class Bot(commands.Bot):
 
             # Очистка предупреждений
             with get_db() as db:
-                self.warnings.cleanup_expired_warnings(db)
+                await self.warnings.cleanup_expired_warnings(db)
                 logger.debug("Очистка устаревших предупреждений выполнена")
 
             # Очистка неактивных голосовых каналов

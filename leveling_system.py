@@ -1,7 +1,5 @@
 """Модуль системы уровней для Discord бота."""
 
-import json
-from pathlib import Path
 import random
 import asyncio
 from datetime import datetime, timedelta
@@ -11,19 +9,28 @@ import discord
 import os
 import pickle
 
+from infrastructure.config import LevelsStore
+from infrastructure.db import LevelsRepository
+
 logger = logging.getLogger(__name__)
 
 class LevelingSystem:
     """Класс для управления системой уровней."""
     
-    def __init__(self, bot):
+    def __init__(
+        self,
+        bot,
+        repository: LevelsRepository,
+        store: LevelsStore,
+    ):
         """Инициализация системы уровней.
         
         Args:
             bot: Экземпляр бота
         """
         self.bot = bot
-        self.data_file = Path("levels.json")
+        self.repository = repository
+        self.store = store
         self.data = self.load_data()
         self.xp_cooldowns: Dict[str, datetime] = {}
         self.use_db = True
@@ -34,10 +41,7 @@ class LevelingSystem:
         Returns:
             Dict: Загруженные данные или пустой словарь
         """
-        if self.data_file.exists():
-            with open(self.data_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        return {}
+        return self.store.load()
         
     def save_data(self) -> None:
         """Сохранение данных об уровнях в файл.
@@ -46,8 +50,7 @@ class LevelingSystem:
         """
         # Сохраняем только если используем файловую систему
         if not self.use_db:
-            with open(self.data_file, 'w', encoding='utf-8') as f:
-                json.dump(self.data, f, indent=4)
+            self.store.save(self.data)
             
     def get_xp_for_level(self, level: int) -> int:
         """Расчет необходимого опыта для уровня.
@@ -142,43 +145,25 @@ class LevelingSystem:
         Returns:
             Tuple[bool, Optional[int]]: (Было ли повышение уровня, Новый уровень)
         """
+        await self.repository.ensure_last_message_time_column()
+
         # Рассчитываем случайное количество опыта (от 15 до 25)
         xp_gain = random.randint(15, 25)
         
         # Проверяем, есть ли пользователь в базе
-        user_data = await self.bot.db.fetch_one(
-            "SELECT xp, level FROM levels WHERE user_id = ? AND guild_id = ?",
-            (int(user_id), int(guild_id))
+        user_data = await self.repository.get_user_level_xp(
+            int(user_id), int(guild_id)
         )
         
         if not user_data:
             # Если пользователя нет, добавляем его
-            try:
-                # Проверяем, есть ли колонка last_message_time в таблице
-                table_info = await self.bot.db.fetch_all(
-                    "PRAGMA table_info(levels)"
-                )
-                columns = [col["name"] for col in table_info]
-                
-                if "last_message_time" in columns:
-                    # Если колонка существует
-                    await self.bot.db.execute(
-                        "INSERT INTO levels (user_id, guild_id, xp, level, last_message_time) VALUES (?, ?, ?, ?, ?)",
-                        (int(user_id), int(guild_id), xp_gain, 0, current_time.isoformat())
-                    )
-                else:
-                    # Если колонки нет, используем старую схему
-                    await self.bot.db.execute(
-                        "INSERT INTO levels (user_id, guild_id, xp, level) VALUES (?, ?, ?, ?)",
-                        (int(user_id), int(guild_id), xp_gain, 0)
-                    )
-            except Exception as e:
-                logger.error(f"Ошибка при добавлении пользователя в БД: {e}")
-                # Используем простой запрос без last_message_time
-                await self.bot.db.execute(
-                    "INSERT INTO levels (user_id, guild_id, xp, level) VALUES (?, ?, ?, ?)",
-                    (int(user_id), int(guild_id), xp_gain, 0)
-                )
+            await self.repository.create_user(
+                int(user_id),
+                int(guild_id),
+                xp_gain,
+                0,
+                current_time.isoformat(),
+            )
             return False, None
         
         # Обновляем опыт пользователя
@@ -187,32 +172,13 @@ class LevelingSystem:
         new_level = self.get_level_for_xp(current_xp)
         
         # Обновляем данные в базе с проверкой наличия колонки last_message_time
-        try:
-            # Проверяем, есть ли колонка last_message_time в таблице
-            table_info = await self.bot.db.fetch_all(
-                "PRAGMA table_info(levels)"
-            )
-            columns = [col["name"] for col in table_info]
-            
-            if "last_message_time" in columns:
-                # Если колонка существует
-                await self.bot.db.execute(
-                    "UPDATE levels SET xp = ?, level = ?, last_message_time = ? WHERE user_id = ? AND guild_id = ?",
-                    (current_xp, new_level, current_time.isoformat(), int(user_id), int(guild_id))
-                )
-            else:
-                # Если колонки нет, используем старую схему
-                await self.bot.db.execute(
-                    "UPDATE levels SET xp = ?, level = ? WHERE user_id = ? AND guild_id = ?",
-                    (current_xp, new_level, int(user_id), int(guild_id))
-                )
-        except Exception as e:
-            logger.error(f"Ошибка при обновлении опыта в БД: {e}")
-            # Используем простой запрос без last_message_time
-            await self.bot.db.execute(
-                "UPDATE levels SET xp = ?, level = ? WHERE user_id = ? AND guild_id = ?",
-                (current_xp, new_level, int(user_id), int(guild_id))
-            )
+        await self.repository.update_user(
+            int(user_id),
+            int(guild_id),
+            current_xp,
+            new_level,
+            current_time.isoformat(),
+        )
         
         # Если уровень повысился
         if new_level > current_level:
@@ -311,9 +277,8 @@ class LevelingSystem:
         # Используем БД если доступна
         if self.use_db:
             try:
-                user_data = await self.bot.db.fetch_one(
-                    "SELECT xp, level FROM levels WHERE user_id = ? AND guild_id = ?",
-                    (int(user_id), int(guild_id))
+                user_data = await self.repository.get_user_level_xp(
+                    int(user_id), int(guild_id)
                 )
                 
                 if user_data:
@@ -368,18 +333,9 @@ class LevelingSystem:
         # Use DB if available
         if self.use_db:
             try:
-                leaderboard_data = await self.bot.db.fetch_all(
-                    "SELECT user_id, xp, level FROM levels WHERE guild_id = ? ORDER BY level DESC, xp DESC LIMIT ?",
-                    (int(guild_id), limit)
+                result = await self.repository.get_leaderboard(
+                    int(guild_id), limit
                 )
-                result = [
-                    {
-                        "user_id": str(row["user_id"]),
-                        "xp": row["xp"],
-                        "level": row["level"]
-                    }
-                    for row in leaderboard_data
-                ]
                 if redis_client:
                     try:
                         redis_client.setex(cache_key, 60, pickle.dumps(result))
@@ -409,52 +365,18 @@ class LevelingSystem:
             
         # Проверяем, есть ли колонка last_message_time в таблице
         try:
-            table_info = await self.bot.db.fetch_all(
-                "PRAGMA table_info(levels)"
-            )
-            columns = [col["name"] for col in table_info]
-            
-            has_last_message_time = "last_message_time" in columns
-            
-            # Если колонки нет, добавляем её
-            if not has_last_message_time:
-                logger.info("Добавление колонки last_message_time в таблицу levels")
-                await self.bot.db.execute(
-                    "ALTER TABLE levels ADD COLUMN last_message_time TIMESTAMP"
-                )
-                
-            # Теперь мигрируем данные
-            for guild_id, guild_data in self.data.items():
-                for user_id, user_data in guild_data.items():
-                    try:
-                        # Проверяем, есть ли пользователь в базе
-                        user_db = await self.bot.db.fetch_one(
-                            "SELECT user_id FROM levels WHERE user_id = ? AND guild_id = ?",
-                            (int(user_id), int(guild_id))
-                        )
-                        
-                        if not user_db:
-                            # Если пользователя нет, добавляем его
-                            current_time = datetime.now().isoformat()
-                            if has_last_message_time:
-                                await self.bot.db.execute(
-                                    "INSERT INTO levels (user_id, guild_id, xp, level, last_message_time) VALUES (?, ?, ?, ?, ?)",
-                                    (int(user_id), int(guild_id), user_data["xp"], user_data["level"], current_time)
-                                )
-                            else:
-                                await self.bot.db.execute(
-                                    "INSERT INTO levels (user_id, guild_id, xp, level) VALUES (?, ?, ?, ?)",
-                                    (int(user_id), int(guild_id), user_data["xp"], user_data["level"])
-                                )
-                    except Exception as e:
-                        logger.error(f"Ошибка при миграции данных в БД: {e}")
+            await self.repository.migrate_from_json(self.data)
         except Exception as e:
             logger.error(f"Ошибка при проверке схемы таблицы levels: {e}")
             self.use_db = False  # Используем файловую систему при ошибке
 
 leveling: Optional[LevelingSystem] = None
 
-def init_leveling(bot) -> LevelingSystem:
+def init_leveling(
+    bot,
+    repository: LevelsRepository,
+    store: LevelsStore,
+) -> LevelingSystem:
     """Инициализация системы уровней.
     
     Args:
@@ -464,7 +386,7 @@ def init_leveling(bot) -> LevelingSystem:
         LevelingSystem: Экземпляр системы уровней
     """
     global leveling
-    leveling = LevelingSystem(bot)
+    leveling = LevelingSystem(bot, repository, store)
 
     return leveling
 

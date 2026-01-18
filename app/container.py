@@ -17,6 +17,9 @@ from tickets import TicketSystem
 from warning_system import WarningSystem
 from welcome import Welcome
 
+from infrastructure.config import LevelsStore, TicketsConfigStore, WarningsConfigStore, WarningsStore
+from infrastructure.db import LevelsRepository, TicketsRepository, WarningsRepository
+
 
 @dataclass(frozen=True)
 class BotServices:
@@ -41,6 +44,10 @@ class Container:
         self.metrics_port = int(os.getenv("METRICS_PORT", "8000"))
         self.db = Database()
         self.image_generator = ImageGenerator()
+        self.levels_store = LevelsStore()
+        self.tickets_store = TicketsConfigStore()
+        self.warnings_store = WarningsStore()
+        self.warnings_config_store = WarningsConfigStore()
         self.initial_extensions = [
             "cogs.events",
             "cogs.commands",
@@ -59,15 +66,32 @@ class Container:
     def build_services(self, bot) -> BotServices:
         """Создать сервисы, которым нужен экземпляр бота."""
 
+        levels_repository = LevelsRepository(self.db)
+        tickets_repository = TicketsRepository(self.db)
+        warnings_repository = WarningsRepository(self.db)
+
         return BotServices(
             moderation=Moderation(bot),
             welcome=Welcome(bot),
             role_rewards=RoleRewards(bot),
-            leveling=leveling_system.init_leveling(bot),
+            leveling=leveling_system.init_leveling(
+                bot,
+                levels_repository,
+                self.levels_store,
+            ),
             automod=AutoMod(bot),
             logging=LoggingSystem(bot),
-            tickets=TicketSystem(bot),
+            tickets=TicketSystem(
+                bot,
+                tickets_repository,
+                self.tickets_store,
+            ),
             temp_voice=TempVoice(bot),
-            warnings=WarningSystem(bot),
+            warnings=WarningSystem(
+                bot,
+                warnings_repository,
+                self.warnings_store,
+                self.warnings_config_store,
+            ),
         )
 

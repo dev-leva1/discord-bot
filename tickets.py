@@ -1,13 +1,17 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import json
 import asyncio
 from datetime import datetime
 
+from infrastructure.config import TicketsConfigStore
+from infrastructure.db import TicketsRepository
+
 class TicketSystem(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot, repository: TicketsRepository | None = None, store: TicketsConfigStore | None = None):
         self.bot = bot
+        self.repository = repository
+        self.store = store or TicketsConfigStore()
         self.tickets_config = self.load_config()
 
     async def setup(self):
@@ -15,22 +19,10 @@ class TicketSystem(commands.Cog):
         print("Система тикетов готова к работе")
 
     def load_config(self):
-        try:
-            with open('tickets_config.json', 'r') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            default_config = {
-                "ticket_category": None,
-                "support_role": None,
-                "ticket_counter": 0
-            }
-            with open('tickets_config.json', 'w') as f:
-                json.dump(default_config, f, indent=4)
-            return default_config
+        return self.store.load()
 
     def save_config(self):
-        with open('tickets_config.json', 'w') as f:
-            json.dump(self.tickets_config, f, indent=4)
+        self.store.save(self.tickets_config)
 
     @app_commands.command(name="ticket_setup", description="Настроить систему тикетов")
     @app_commands.checks.has_permissions(administrator=True)
@@ -80,6 +72,14 @@ class TicketSystem(commands.Cog):
         )
         
         await channel.send(f"{support_role.mention}", embed=embed)
+        if self.repository:
+            await self.repository.create_ticket(
+                interaction.guild.id,
+                channel.id,
+                interaction.user.id,
+                reason,
+                datetime.utcnow().isoformat(),
+            )
         await interaction.response.send_message(f"Тикет создан! Перейдите в {channel.mention}")
         self.save_config()
 
@@ -93,6 +93,8 @@ class TicketSystem(commands.Cog):
 
         await interaction.response.send_message("Тикет будет закрыт через 5 секунд...")
         await asyncio.sleep(5)
+        if self.repository:
+            await self.repository.close_ticket(interaction.channel.id)
         await interaction.channel.delete()
 
 async def setup(bot):

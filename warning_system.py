@@ -3,13 +3,24 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Union
 
+from infrastructure.config import WarningsConfigStore, WarningsStore
+from infrastructure.db import WarningsRepository
+
 class WarningSystem(commands.Cog):
-    def __init__(self, bot):
+    def __init__(
+        self,
+        bot,
+        repository: WarningsRepository | None = None,
+        store: WarningsStore | None = None,
+        config_store: WarningsConfigStore | None = None,
+    ):
         self.bot = bot
+        self.repository = repository
+        self.store = store or WarningsStore()
+        self.config_store = config_store or WarningsConfigStore()
         self.warnings = self.load_warnings()
         self.config = self.load_config()
 
@@ -23,13 +34,7 @@ class WarningSystem(commands.Cog):
         Returns:
             Dict: Загруженные предупреждения
         """
-        try:
-            with open('warnings.json', 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            with open('warnings.json', 'w', encoding='utf-8') as f:
-                json.dump({}, f)
-            return {}
+        return self.store.load()
 
     def load_config(self) -> Dict:
         """Загрузка конфигурации из файла.
@@ -37,26 +42,19 @@ class WarningSystem(commands.Cog):
         Returns:
             Dict: Загруженная конфигурация
         """
-        try:
-            with open('warnings_config.json', 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            default_config = {
-                "punishments": {
-                    "3": "mute_1h",
-                    "5": "mute_12h",
-                    "7": "kick",
-                    "10": "ban"
-                }
-            }
-            with open('warnings_config.json', 'w', encoding='utf-8') as f:
-                json.dump(default_config, f, indent=4)
-            return default_config
+        return self.config_store.load()
+
+    async def migrate_to_db(self) -> None:
+        """Миграция предупреждений из JSON в БД."""
+
+        if not self.repository:
+            return
+
+        await self.repository.migrate_from_json(self.warnings)
 
     def save_warnings(self) -> None:
         """Сохранение предупреждений в файл."""
-        with open('warnings.json', 'w', encoding='utf-8') as f:
-            json.dump(self.warnings, f, indent=4)
+        self.store.save(self.warnings)
 
     def get_user_warnings(self, guild_id: int, user_id: int) -> List[Dict]:
         """Получение предупреждений пользователя.
@@ -79,7 +77,7 @@ class WarningSystem(commands.Cog):
         
         return self.warnings[guild_id][user_id]
 
-    def cleanup_expired_warnings(self, db) -> None:
+    async def cleanup_expired_warnings(self, db) -> None:
         """Очистка устаревших предупреждений.
         
         Args:
@@ -107,6 +105,8 @@ class WarningSystem(commands.Cog):
                 del self.warnings[guild_id]
         
         self.save_warnings()
+        if self.repository:
+            await self.repository.cleanup_expired(days=30)
 
     @commands.hybrid_command(name="warn_add", description="Выдать предупреждение участнику")
     @commands.has_permissions(kick_members=True)
@@ -135,6 +135,15 @@ class WarningSystem(commands.Cog):
         warnings = self.get_user_warnings(ctx.guild.id, member.id)
         warnings.append(warning)
         self.save_warnings()
+        if self.repository:
+            await self.repository.add_warning(
+                ctx.guild.id,
+                member.id,
+                reason,
+                ctx.user.id,
+                warning["timestamp"],
+                None,
+            )
 
         warning_count = len(warnings)
         
@@ -203,6 +212,10 @@ class WarningSystem(commands.Cog):
         
         removed = warnings.pop(index - 1)
         self.save_warnings()
+        if self.repository:
+            listed = await self.repository.list_warnings(ctx.guild.id, member.id)
+            if 0 <= index - 1 < len(listed):
+                await self.repository.delete_warning(listed[index - 1]["id"])
         
         await (ctx.response.send_message if is_interaction else ctx.send)(f"Предупреждение #{index} было удалено у {member.mention}: \"{removed['reason']}\"")
 
@@ -248,6 +261,8 @@ class WarningSystem(commands.Cog):
         
         self.warnings[str(ctx.guild.id)][str(member.id)] = []
         self.save_warnings()
+        if self.repository:
+            await self.repository.clear_user_warnings(ctx.guild.id, member.id)
         
         await (ctx.response.send_message if is_interaction else ctx.send)(f"Все предупреждения {member.mention} были удалены")
 

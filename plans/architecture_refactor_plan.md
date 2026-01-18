@@ -6,7 +6,7 @@
 
 - Точка входа и оркестрация в [`app/bot.py`](../app/bot.py:1) с совместимым re-export через [`bot.py`](../bot.py:1)
 - Команды частично в когах ([`cogs/commands.py`](../cogs/commands.py:1), [`cogs/events.py`](../cogs/events.py:1)), частично в новых когах presentation ([`presentation/automod.py`](../presentation/automod.py:1), [`presentation/moderation.py`](../presentation/moderation.py:1))
-- Данные в разрозненных источниках: SQLite через [`database/db.py`](../database/db.py:1), JSON-конфиги ([`automod.py`](../automod.py:1), [`tickets.py`](../tickets.py:1))
+- Данные в разрозненных источниках: SQLite через [`database/db.py`](../database/db.py:1), JSON-конфиги ([`automod.py`](../automod.py:1), [`tickets.py`](../tickets.py:1)); часть JSON вынесена в `infrastructure/config` ([`infrastructure/config/__init__.py`](../infrastructure/config/__init__.py:1))
 - Инициализация мониторинга на уровне импорта ([`utils/monitoring.py`](../utils/monitoring.py:1))
 
 ## Целевая модель слоев
@@ -64,9 +64,9 @@ mee6/
 - [x] Сервисы оставить чистыми: без `bot.tree` и без `discord.Interaction`.
 
 ### Этап 3. Единый слой данных
-- [ ] Ввести репозитории (LevelsRepository, TicketsRepository, WarningsRepository).
-- [ ] Перенести SQL-логику из [`leveling_system.py`](../leveling_system.py:1) в инфраструктурный слой.
-- [ ] Оставить JSON только как миграционный fallback, вынести в `infrastructure/config`.
+- [x] Ввести репозитории (LevelsRepository, TicketsRepository, WarningsRepository) в `infrastructure/db` ([`infrastructure/db/__init__.py`](../infrastructure/db/__init__.py:1)).
+- [x] Перенести SQL-логику из [`leveling_system.py`](../leveling_system.py:1) в инфраструктурный слой (LevelsRepository).
+- [x] Оставить JSON только как миграционный fallback, вынести в `infrastructure/config` ([`infrastructure/config/__init__.py`](../infrastructure/config/__init__.py:1)).
 
 ### Этап 4. Конфиг и мониторинг
 - [ ] Централизовать конфиги (automod, tickets, env) в `infrastructure/config`.
