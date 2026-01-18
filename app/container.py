@@ -17,7 +17,14 @@ from tickets import TicketSystem
 from warning_system import WarningSystem
 from welcome import Welcome
 
-from infrastructure.config import LevelsStore, TicketsConfigStore, WarningsConfigStore, WarningsStore
+from infrastructure.config import (
+    AutomodConfigStore,
+    LevelsStore,
+    TicketsConfigStore,
+    WarningsConfigStore,
+    WarningsStore,
+)
+from infrastructure.monitoring import init_monitoring
 from infrastructure.db import LevelsRepository, TicketsRepository, WarningsRepository
 
 
@@ -40,12 +47,14 @@ class Container:
     """Простой DI-контейнер с фабриками."""
 
     def __init__(self) -> None:
+        init_monitoring()
         self.use_metrics = os.getenv("USE_METRICS", "False").lower() == "true"
         self.metrics_port = int(os.getenv("METRICS_PORT", "8000"))
         self.db = Database()
         self.image_generator = ImageGenerator()
         self.levels_store = LevelsStore()
         self.tickets_store = TicketsConfigStore()
+        self.automod_store = AutomodConfigStore()
         self.warnings_store = WarningsStore()
         self.warnings_config_store = WarningsConfigStore()
         self.initial_extensions = [
@@ -79,7 +88,7 @@ class Container:
                 levels_repository,
                 self.levels_store,
             ),
-            automod=AutoMod(bot),
+            automod=AutoMod(bot, self.automod_store),
             logging=LoggingSystem(bot),
             tickets=TicketSystem(
                 bot,

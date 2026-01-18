@@ -1,23 +1,23 @@
 """Модуль автомодерации для Discord бота."""
 
-import json
 from datetime import datetime, timedelta
-from pathlib import Path
 import re
 
 import discord
 
+from infrastructure.config import AutomodConfigStore
+
 class AutoMod:
     """Класс для управления автомодерацией на сервере."""
     
-    def __init__(self, bot):
+    def __init__(self, bot, store: AutomodConfigStore | None = None):
         """Инициализация автомодерации.
         
         Args:
             bot: Экземпляр бота
         """
         self.bot = bot
-        self.config_file = Path("automod_config.json")
+        self.store = store or AutomodConfigStore()
         self.config = self.load_config()
         self.spam_counter = {}
         self.warning_counter = {}
@@ -28,22 +28,11 @@ class AutoMod:
         Returns:
             dict: Загруженная конфигурация или значения по умолчанию
         """
-        if self.config_file.exists():
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        return {
-            "banned_words": [],
-            "spam_threshold": 5,
-            "spam_interval": 5,
-            "max_mentions": 3,
-            "max_warnings": 3,
-            "mute_duration": "1h"
-        }
+        return self.store.load()
         
     def save_config(self):
         """Сохранение конфигурации в файл."""
-        with open(self.config_file, 'w', encoding='utf-8') as f:
-            json.dump(self.config, f, indent=4)
+        self.store.save(self.config)
             
     async def setup(self):
         """Настройка команд автомодерации (перенесена в presentation слой)."""

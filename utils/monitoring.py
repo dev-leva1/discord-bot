@@ -15,40 +15,59 @@ import socket
 # Настройка логгера
 logger = logging.getLogger(__name__)
 
-# Конфигурация Sentry
-SENTRY_DSN: Optional[str] = os.getenv('SENTRY_DSN')
-ENVIRONMENT: str = os.getenv('ENVIRONMENT', 'production')
+SENTRY_DSN: Optional[str] = None
+ENVIRONMENT: str = "production"
+SENTRY_ENABLED: bool = False
 
-if SENTRY_DSN:
+
+def init_sentry(
+    dsn: Optional[str],
+    environment: str,
+    release: Optional[str] = None,
+) -> None:
+    """Явная инициализация Sentry без сайд-эффектов импорта."""
+
+    global SENTRY_DSN, ENVIRONMENT, SENTRY_ENABLED
+    SENTRY_DSN = dsn
+    ENVIRONMENT = environment
+    SENTRY_ENABLED = False
+
+    if not dsn:
+        logger.info("Sentry отключен (DSN не настроен)")
+        return
+
     try:
-        # Настраиваем интеграцию с логгером
         logging_integration = LoggingIntegration(
-            level=logging.INFO,        # Захват логов уровня INFO и выше
-            event_level=logging.ERROR  # Отправка в Sentry только ошибок уровня ERROR и выше
+            level=logging.INFO,
+            event_level=logging.ERROR,
         )
-        
+
         sentry_sdk.init(
-            dsn=SENTRY_DSN,
-            environment=ENVIRONMENT,
+            dsn=dsn,
+            environment=environment,
             traces_sample_rate=1.0,
             profiles_sample_rate=0.5,
-            release=os.getenv('VERSION', '1.0.0'),
+            release=release or os.getenv("VERSION", "1.0.0"),
             integrations=[logging_integration],
-            # Добавляем информацию о системе
             before_send=lambda event, hint: {
                 **event,
-                'contexts': {
-                    **event.get('contexts', {}),
-                    'os': {'name': platform.system(), 'version': platform.version()},
-                    'runtime': {'name': 'python', 'version': platform.python_version()},
-                }
+                "contexts": {
+                    **event.get("contexts", {}),
+                    "os": {
+                        "name": platform.system(),
+                        "version": platform.version(),
+                    },
+                    "runtime": {
+                        "name": "python",
+                        "version": platform.python_version(),
+                    },
+                },
             },
         )
+        SENTRY_ENABLED = True
         logger.info("Sentry успешно инициализирован")
     except Exception as e:
         logger.error(f"Ошибка инициализации Sentry: {e}")
-else:
-    logger.info("Sentry отключен (DSN не настроен)")
 
 # Prometheus метрики
 COMMANDS_TOTAL = Counter(
@@ -193,7 +212,7 @@ def monitor_command(func: Callable[..., Any]) -> Callable[..., Any]:
             ERRORS_COUNT.labels(type=type(e).__name__, module=func.__module__).inc()
             
             # Отправка ошибки в Sentry
-            if SENTRY_DSN:
+            if SENTRY_ENABLED:
                 extra_data = {
                     'command': command_name,
                     'guild_id': guild_id,
@@ -390,7 +409,7 @@ def capture_error(
         logger.error(f"{log_message}\nТрассировка:\n{tb_str}")
         
         # Отправка в Sentry если настроен
-        if SENTRY_DSN:
+        if SENTRY_ENABLED:
             with sentry_sdk.configure_scope() as scope:
                 if context:
                     for key, value in context.items():
