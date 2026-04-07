@@ -339,7 +339,8 @@ class LevelingSystem(LevelingServiceContract):
             if cached:
                 try:
                     import json
-                    return json.loads(cached.decode('utf-8'))
+
+                    return json.loads(cached.decode("utf-8"))
                 except Exception as e:
                     logger.warning(f"Failed to load cached leaderboard: {e}")
         # Use DB if available
@@ -349,6 +350,7 @@ class LevelingSystem(LevelingServiceContract):
                 if redis_client:
                     try:
                         import json
+
                         redis_client.setex(cache_key, 60, json.dumps(result))
                     except Exception as e:
                         logger.warning(f"Failed to cache leaderboard: {e}")

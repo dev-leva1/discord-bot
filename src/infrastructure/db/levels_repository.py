@@ -78,13 +78,15 @@ class LevelsRepository(LevelsRepositoryContract):
         batch = []
         for guild_id, guild_data in data.items():
             for user_id, user_data in guild_data.items():
-                batch.append((
-                    int(user_id),
-                    int(guild_id),
-                    user_data["xp"],
-                    user_data["level"],
-                    current_time,
-                ))
+                batch.append(
+                    (
+                        int(user_id),
+                        int(guild_id),
+                        user_data["xp"],
+                        user_data["level"],
+                        current_time,
+                    )
+                )
 
         # Вставляем все записи одним запросом (игнорируем дубликаты)
         if batch:

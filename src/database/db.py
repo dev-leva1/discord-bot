@@ -177,10 +177,18 @@ class Database:
 
             # Создание индексов для оптимизации запросов
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_levels_guild ON levels(guild_id)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_levels_user_guild ON levels(user_id, guild_id)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_warnings_guild_user ON warnings(guild_id, user_id)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_warnings_issued_at ON warnings(issued_at)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_tickets_channel ON tickets(channel_id)")
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_levels_user_guild ON levels(user_id, guild_id)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_warnings_guild_user ON warnings(guild_id, user_id)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_warnings_issued_at ON warnings(issued_at)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tickets_channel ON tickets(channel_id)"
+            )
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_tickets_guild ON tickets(guild_id)")
             logger.info("Созданы индексы для оптимизации запросов")
 

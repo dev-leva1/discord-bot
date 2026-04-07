@@ -52,7 +52,10 @@ def check_role_hierarchy(
         tuple[bool, str | None]: (Можно ли выполнить действие, Сообщение об ошибке)
     """
     if target.top_role >= moderator.top_role:
-        return False, "Вы не можете выполнить это действие на пользователе с равной или более высокой ролью!"
+        return (
+            False,
+            "Вы не можете выполнить это действие на пользователе с равной или более высокой ролью!",
+        )
 
     if target.guild.owner_id == target.id:
         return False, "Вы не можете выполнить это действие на владельце сервера!"

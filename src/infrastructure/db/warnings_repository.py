@@ -65,14 +65,16 @@ class WarningsRepository(WarningsRepositoryContract):
         for guild_id, guild_data in data.items():
             for user_id, warnings in guild_data.items():
                 for warning in warnings:
-                    batch.append((
-                        int(user_id),
-                        int(guild_id),
-                        warning.get("reason", ""),
-                        int(warning.get("moderator", 0)),
-                        warning.get("timestamp"),
-                        None,
-                    ))
+                    batch.append(
+                        (
+                            int(user_id),
+                            int(guild_id),
+                            warning.get("reason", ""),
+                            int(warning.get("moderator", 0)),
+                            warning.get("timestamp"),
+                            None,
+                        )
+                    )
 
         # Вставляем все записи одним запросом
         if batch:

@@ -50,7 +50,8 @@ class AutoMod(AutomodServiceContract):
         for user_key in list(self.spam_counter.keys()):
             # Фильтруем старые временные метки
             self.spam_counter[user_key] = [
-                t for t in self.spam_counter[user_key]
+                t
+                for t in self.spam_counter[user_key]
                 if (now - t).total_seconds() <= spam_interval * 2
             ]
             # Удаляем пустые записи
