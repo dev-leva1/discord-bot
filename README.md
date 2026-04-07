@@ -2,6 +2,8 @@
 
 Многофункциональный Discord бот с системой уровней, модерацией, автомодерацией, тикетами, временными голосовыми каналами и другими полезными функциями.
 
+**Версия:** 1.1.0
+
 ![Preview png](https://i.imgur.com/4mcFuzQ.png)
 
 ## Основные функции
@@ -39,6 +41,8 @@
 - Конфигурация: [docs/configuration.md](docs/configuration.md:1)
 - FAQ: [docs/faq.md](docs/faq.md:1)
 - Миграция: [docs/migration.md](docs/migration.md:1)
+- История изменений: [docs/CHANGELOG.md](docs/CHANGELOG.md:1)
+- Тесты: [docs/tests.md](docs/tests.md:1)
 
 ## Установка и запуск
 
@@ -47,6 +51,7 @@
 - Python 3.10 или выше
 - Redis (опционально, для кэширования)
 - PostgreSQL (опционально, по умолчанию используется SQLite)
+- MongoDB (опционально, для расширенного хранилища)
 
 ### Установка
 
@@ -58,7 +63,7 @@
 
 2. Установите зависимости:
    ```
-   uv pip install -e .[dev]
+   uv pip install -e ".[dev]"
    ```
 
 3. Создайте файл `data/.env`:
@@ -119,14 +124,15 @@
 
 ### Автомодерация
 
-- `/automod addword` - Добавить запрещенное слово
-- `/automod removeword` - Удалить запрещенное слово
-- `/automod listwords` - Список запрещенных слов
-- `/automod setspam` - Установить порог спама
-- `/automod setinterval` - Установить интервал спама
-- `/automod setmentions` - Установить лимит упоминаний
-- `/automod setwarnings` - Установить максимум предупреждений
-- `/automod setmute` - Установить длительность мута
+- `/automod` - Настройка автомодерации (параметры: action, value)
+  - `action=addword` - Добавить запрещенное слово
+  - `action=removeword` - Удалить запрещенное слово
+  - `action=listwords` - Список запрещенных слов
+  - `action=setspam` - Установить порог спама
+  - `action=setinterval` - Установить интервал спама
+  - `action=setmentions` - Установить лимит упоминаний
+  - `action=setwarnings` - Установить максимум предупреждений
+  - `action=setmute` - Установить длительность мута
 
 ### Тикеты
 
@@ -160,15 +166,19 @@ mee6/
 ├── assets/            # Шрифты и ресурсы
 ├── data/              # .env, JSON конфиги, база
 ├── docs/              # Документация
+├── plans/             # Планы разработки
 ├── src/               # Исходный код
-│   ├── app/
-│   ├── application/
-│   ├── cogs/
-│   ├── infrastructure/
-│   └── ...
+│   ├── app/           # Точка входа и DI-контейнер
+│   ├── application/   # Контракты сервисов
+│   ├── cogs/          # Команды и события Discord
+│   ├── database/      # Модели и подключение к БД
+│   ├── domain/        # Бизнес-логика
+│   ├── infrastructure/# Репозитории, конфиги, кэш, мониторинг
+│   ├── presentation/  # Коги для UI (automod, moderation)
+│   └── utils/         # Вспомогательные функции
 ├── tests/             # Тесты
 ├── bot.py             # Точка входа
-└── pyproject.toml      # Зависимости и метаданные
+└── pyproject.toml     # Зависимости и метаданные
 ```
 
 ## Лицензия
