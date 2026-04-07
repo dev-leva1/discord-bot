@@ -1,0 +1,210 @@
+Metadata-Version: 2.4
+Name: mee6-discord-bot
+Version: 1.1.0
+Summary: Многофункциональный Discord бот
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: discord.py>=2.3.2
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: Pillow>=10.0.0
+Requires-Dist: aiohttp>=3.9.1
+Requires-Dist: python-dateutil>=2.8.2
+Requires-Dist: asyncio>=3.4.3
+Requires-Dist: SQLAlchemy>=2.0.0
+Requires-Dist: alembic>=1.13.0
+Requires-Dist: psycopg2-binary>=2.9.9
+Requires-Dist: redis>=5.0.1
+Requires-Dist: sentry-sdk>=1.40.0
+Requires-Dist: prometheus-client>=0.19.0
+Requires-Dist: PyNaCl>=1.5.0
+Requires-Dist: aiosqlite>=0.19.0
+Requires-Dist: aiocache>=0.12.2
+Requires-Dist: motor>=3.3.2
+Requires-Dist: ujson>=5.8.0
+Requires-Dist: backoff>=2.2.1
+Requires-Dist: pycryptodome>=3.19.1
+Requires-Dist: cryptography>=42.0.0
+Requires-Dist: fastapi>=0.110.0
+Requires-Dist: uvicorn>=0.27.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.0; extra == "dev"
+Dynamic: license-file
+
+# Discord Bot
+
+Многофункциональный Discord бот с системой уровней, модерацией, автомодерацией, тикетами, временными голосовыми каналами и другими полезными функциями.
+
+![Preview png](https://i.imgur.com/4mcFuzQ.png)
+
+## Основные функции
+
+- **Система уровней** - пользователи получают опыт за активность в чате
+  - Красивые карточки уровней
+  - Таблица лидеров
+  - Автоматическая выдача ролей за уровни
+
+- **Модерация** - команды для модерации сервера (бан, кик, мут, предупреждения)
+  - Базовые команды (бан, кик, мут, очистка сообщений)
+  - Автомодерация (фильтр слов, анти-спам, лимит упоминаний)
+  - Система предупреждений
+
+- **Автомодерация** - защита от спама, нецензурных слов, множественных упоминаний
+
+- **Система тикетов** - создание тикетов для общения с администрацией
+
+- **Временные голосовые каналы** - создание временных голосовых каналов пользователями
+
+- **Системы логирования** - логирование действий на сервере
+  - Отслеживание действий модерации
+  - Логи сообщений (удаление, редактирование)
+  - Логи участников (вход/выход, изменение ролей)
+  - Логи голосовых каналов
+
+- **Приветствия** - настраиваемые сообщения при входе на сервер
+  - Настраиваемый канал приветствий
+  - Красивые карточки приветствия
+
+## Быстрые ссылки
+
+- Документация: [docs/overview.md](docs/overview.md:1)
+- Установка: [docs/setup.md](docs/setup.md:1)
+- Конфигурация: [docs/configuration.md](docs/configuration.md:1)
+- FAQ: [docs/faq.md](docs/faq.md:1)
+- Миграция: [docs/migration.md](docs/migration.md:1)
+
+## Установка и запуск
+
+### Предварительные требования
+
+- Python 3.10 или выше
+- Redis (опционально, для кэширования)
+- PostgreSQL (опционально, по умолчанию используется SQLite)
+
+### Установка
+
+1. Клонируйте репозиторий:
+   ```
+   git clone https://github.com/dev-leva1/discord-bot.git
+   cd discord-bot
+   ```
+
+2. Установите зависимости:
+   ```
+   uv pip install -e .[dev]
+   ```
+
+3. Создайте файл `data/.env`:
+   ```
+   # Discord Bot Token
+   DISCORD_TOKEN=your_discord_token_here
+
+   # Database Configuration
+   DB_POOL_SIZE=5
+   REDIS_URL=redis://localhost:6379/0
+
+   # Monitoring
+   USE_METRICS=true
+   METRICS_PORT=8000
+   SENTRY_DSN=your_sentry_dsn_here
+   ENVIRONMENT=development
+   VERSION=1.0.0
+   ```
+
+4. Запустите бота:
+   ```
+   python bot.py
+   ```
+
+### Использование Docker (опционально)
+
+1. Соберите образ:
+   ```
+   docker build -t discord-bot .
+   ```
+
+2. Запустите контейнер:
+   ```
+   docker run -d --name discord-bot --env-file data/.env discord-bot
+   ```
+
+## Команды
+
+### Общие команды
+
+- `/help` - Список доступных команд
+- `/rank [пользователь]` - Показать уровень пользователя
+- `/leaderboard [лимит]` - Таблица лидеров по уровням
+- `/ping` - Проверка задержки бота
+- `/serverinfo` - Информация о сервере
+- `/userinfo [пользователь]` - Информация о пользователе
+
+### Модерация
+
+- `/ban <пользователь> [причина]` - Забанить пользователя
+- `/kick <пользователь> [причина]` - Выгнать пользователя
+- `/mute <пользователь> <длительность> [причина]` - Замутить пользователя
+- `/clear <количество>` - Очистить сообщения
+- `/warn_add <пользователь> <причина>` - Выдать предупреждение
+- `/warn_remove <пользователь> <id>` - Удалить предупреждение
+- `/warn_list <пользователь>` - Список предупреждений
+- `/warn_clear <пользователь>` - Очистить все предупреждения
+
+### Автомодерация
+
+- `/automod addword` - Добавить запрещенное слово
+- `/automod removeword` - Удалить запрещенное слово
+- `/automod listwords` - Список запрещенных слов
+- `/automod setspam` - Установить порог спама
+- `/automod setinterval` - Установить интервал спама
+- `/automod setmentions` - Установить лимит упоминаний
+- `/automod setwarnings` - Установить максимум предупреждений
+- `/automod setmute` - Установить длительность мута
+
+### Тикеты
+
+- `/ticket create <тема>` - Создать тикет
+- `/ticket close [причина]` - Закрыть тикет
+- `/ticket setup` - Настроить систему тикетов (только для администраторов)
+
+### Голосовые каналы
+
+- `/voice name <название>` - Изменить название канала
+- `/voice limit <лимит>` - Установить лимит пользователей
+- `/voice lock` - Закрыть канал
+- `/voice unlock` - Открыть канал
+- `/voice setup` - Настроить временные голосовые каналы (только для администраторов)
+
+### Настройки (только для администраторов)
+
+- `/setwelcome <канал>` - Установить канал приветствий
+- `/setlogs <канал>` - Установить канал для логов
+- `/addrole <роль> <уровень>` - Добавить роль за уровень
+- `/removerole <роль>` - Удалить роль за уровень
+- `/listroles` - Список ролей за уровни
+- `/automod` - Настройка автомодерации
+
+## Структура проекта
+
+```
+mee6/
+├── .github/           # Шаблоны и CI
+├── alembic/           # Миграции БД
+├── assets/            # Шрифты и ресурсы
+├── data/              # .env, JSON конфиги, база
+├── docs/              # Документация
+├── src/               # Исходный код
+│   ├── app/
+│   ├── application/
+│   ├── cogs/
+│   ├── infrastructure/
+│   └── ...
+├── tests/             # Тесты
+├── bot.py             # Точка входа
+└── pyproject.toml      # Зависимости и метаданные
+```
+
+## Лицензия
+
+Этот проект распространяется под лицензией MIT. Подробности в файле LICENSE.
