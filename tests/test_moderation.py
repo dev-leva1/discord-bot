@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.moderation import Moderation
+from moderation import Moderation
 
 
 @dataclass

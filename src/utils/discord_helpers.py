@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import Union
 
 import discord
+from discord.ext import commands
 
 
 def parse_duration(duration: str) -> timedelta:
@@ -60,7 +61,7 @@ def check_role_hierarchy(
 
 
 async def send_response(
-    ctx: Union[discord.Interaction, discord.ext.commands.Context],
+    ctx: Union[discord.Interaction, commands.Context],
     content: str,
     **kwargs,
 ) -> None:

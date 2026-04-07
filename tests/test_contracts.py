@@ -1,6 +1,6 @@
 """Smoke тесты на доступность контрактов application слоя."""
 
-from src.application import (
+from application import (
     AutomodServiceContract,
     LevelingServiceContract,
     LoggingServiceContract,
