@@ -3,7 +3,8 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from datetime import timedelta
+
+from utils.discord_helpers import check_role_hierarchy, parse_duration
 
 
 class ModerationCog(commands.Cog):
@@ -18,11 +19,9 @@ class ModerationCog(commands.Cog):
         member: discord.Member,
         reason: str | None = None,
     ):
-        if member.top_role >= interaction.user.top_role:
-            await interaction.response.send_message(
-                "Вы не можете забанить участника с ролью выше или равной вашей!",
-                ephemeral=True,
-            )
+        can_moderate, error_msg = check_role_hierarchy(interaction.user, member)
+        if not can_moderate:
+            await interaction.response.send_message(error_msg, ephemeral=True)
             return
 
         await member.ban(reason=reason)
@@ -43,11 +42,9 @@ class ModerationCog(commands.Cog):
         member: discord.Member,
         reason: str | None = None,
     ):
-        if member.top_role >= interaction.user.top_role:
-            await interaction.response.send_message(
-                "Вы не можете выгнать участника с ролью выше или равной вашей!",
-                ephemeral=True,
-            )
+        can_moderate, error_msg = check_role_hierarchy(interaction.user, member)
+        if not can_moderate:
+            await interaction.response.send_message(error_msg, ephemeral=True)
             return
 
         await member.kick(reason=reason)
@@ -69,33 +66,17 @@ class ModerationCog(commands.Cog):
         duration: str,
         reason: str | None = None,
     ):
-        if member.top_role >= interaction.user.top_role:
-            await interaction.response.send_message(
-                "Вы не можете замутить участника с ролью выше или равной вашей!",
-                ephemeral=True,
-            )
+        can_moderate, error_msg = check_role_hierarchy(interaction.user, member)
+        if not can_moderate:
+            await interaction.response.send_message(error_msg, ephemeral=True)
             return
 
         # Парсинг длительности
         try:
-            duration_value = int(duration[:-1])
-            duration_unit = duration[-1].lower()
-
-            if duration_value <= 0:
-                raise ValueError
-
-            if duration_unit == "m":
-                delta = timedelta(minutes=duration_value)
-            elif duration_unit == "h":
-                delta = timedelta(hours=duration_value)
-            elif duration_unit == "d":
-                delta = timedelta(days=duration_value)
-            else:
-                raise ValueError
-
-        except ValueError:
+            delta = parse_duration(duration)
+        except ValueError as e:
             await interaction.response.send_message(
-                "Неверный формат длительности! Используйте число + m/h/d (например: 30m, 1h, 7d)",
+                f"Ошибка: {str(e)}",
                 ephemeral=True,
             )
             return

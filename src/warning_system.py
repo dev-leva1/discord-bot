@@ -8,10 +8,10 @@ from typing import Dict, List, Union
 
 from infrastructure.config import WarningsConfigStore, WarningsStore
 
-from application.contracts import WarningsRepositoryContract, WarningsServiceContract
+from application.contracts import WarningsRepositoryContract
 
 
-class WarningSystem(commands.Cog, WarningsServiceContract):
+class WarningSystem(commands.Cog):
     def __init__(
         self,
         bot,

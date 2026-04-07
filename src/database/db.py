@@ -48,6 +48,12 @@ class Database:
                 conn = await aiosqlite.connect(self.db_path)
                 # Включаем поддержку внешних ключей
                 await conn.execute("PRAGMA foreign_keys = ON")
+                # Оптимизации производительности
+                await conn.execute("PRAGMA journal_mode = WAL")  # Write-Ahead Logging
+                await conn.execute("PRAGMA synchronous = NORMAL")  # Баланс скорости и безопасности
+                await conn.execute("PRAGMA cache_size = -64000")  # 64MB кэш
+                await conn.execute("PRAGMA temp_store = MEMORY")  # Временные таблицы в памяти
+                await conn.execute("PRAGMA mmap_size = 268435456")  # 256MB memory-mapped I/O
                 self.pool.append(conn)
 
             # Проверка структуры базы и обновление схемы, если необходимо
@@ -146,7 +152,7 @@ class Database:
                     CREATE TABLE IF NOT EXISTS warnings (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         user_id INTEGER,
-                        guild_id INTEGER, 
+                        guild_id INTEGER,
                         reason TEXT,
                         issued_by INTEGER,
                         issued_at TIMESTAMP,
@@ -347,7 +353,7 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS warnings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
-                    guild_id INTEGER, 
+                    guild_id INTEGER,
                     reason TEXT,
                     issued_by INTEGER,
                     issued_at TIMESTAMP,

@@ -1,12 +1,12 @@
 """Модуль автомодерации для Discord бота."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import discord
 
 from infrastructure.config import AutomodConfigStore
-
 from application.contracts import AutomodServiceContract
+from utils.discord_helpers import parse_duration
 
 
 class AutoMod(AutomodServiceContract):
@@ -46,7 +46,6 @@ class AutoMod(AutomodServiceContract):
 
         # Очистка spam_counter - удаляем записи старше удвоенного интервала спама
         spam_interval = self.config.get("spam_interval", 5)
-        spam_cutoff = now - timedelta(seconds=spam_interval * 2)
 
         for user_key in list(self.spam_counter.keys()):
             # Фильтруем старые временные метки
@@ -58,39 +57,13 @@ class AutoMod(AutomodServiceContract):
             if not self.spam_counter[user_key]:
                 del self.spam_counter[user_key]
 
-        # Очистка warning_counter - сбрасываем счетчики старше 1 часа
-        # (предполагаем что предупреждения не должны накапливаться бесконечно)
-        warning_cutoff = now - timedelta(hours=1)
-        expired_warnings = [
-            key for key in self.warning_counter.keys()
-            # Здесь нужна дополнительная логика для отслеживания времени последнего предупреждения
-        ]
+        # Очистка warning_counter - сбрасываем все счетчики старше 1 часа
+        # Для полноценной очистки нужно отслеживать время последнего предупреждения
+        # Пока просто очищаем весь словарь если прошло больше часа с последней очистки
+        if (now - self._last_cleanup).total_seconds() > 3600:
+            self.warning_counter.clear()
 
         self._last_cleanup = now
-
-    async def setup(self):
-        """Настройка команд автомодерации (перенесена в presentation слой)."""
-        return None
-
-    def parse_duration(self, duration: str) -> timedelta:
-        """Парсинг длительности мута.
-
-        Args:
-            duration: Строка с длительностью (например, "1h", "30m", "7d")
-
-        Returns:
-            timedelta: Объект с длительностью
-        """
-        value = int(duration[:-1])
-        unit = duration[-1].lower()
-
-        if unit == "m":
-            return timedelta(minutes=value)
-        if unit == "h":
-            return timedelta(hours=value)
-        if unit == "d":
-            return timedelta(days=value)
-        return timedelta(hours=1)  # По умолчанию
 
     async def check_message(self, message: discord.Message) -> bool:
         """Проверка сообщения на нарушения.
@@ -177,7 +150,7 @@ class AutoMod(AutomodServiceContract):
             pass
 
         if self.warning_counter[user_key] >= self.config["max_warnings"]:
-            duration = self.parse_duration(self.config["mute_duration"])
+            duration = parse_duration(self.config["mute_duration"])
             try:
                 await member.timeout(duration, reason="Превышение лимита предупреждений")
                 self.warning_counter[user_key] = 0  # Сброс счетчика

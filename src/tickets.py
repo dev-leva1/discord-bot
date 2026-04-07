@@ -6,10 +6,10 @@ from datetime import datetime
 
 from infrastructure.config import TicketsConfigStore
 
-from application.contracts import TicketsRepositoryContract, TicketsServiceContract
+from application.contracts import TicketsRepositoryContract
 
 
-class TicketSystem(commands.Cog, TicketsServiceContract):
+class TicketSystem(commands.Cog):
     def __init__(
         self,
         bot,
