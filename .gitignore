@@ -16,3 +16,4 @@ Thumbs.db
 tests/__pycache__/
 bot.log
 *.db
+CLAUDE.md

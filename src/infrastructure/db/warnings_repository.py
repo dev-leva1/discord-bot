@@ -60,14 +60,23 @@ class WarningsRepository(WarningsRepositoryContract):
         )
 
     async def migrate_from_json(self, data: Dict) -> None:
+        # Собираем все записи для батчинга
+        batch = []
         for guild_id, guild_data in data.items():
             for user_id, warnings in guild_data.items():
                 for warning in warnings:
-                    await self.add_warning(
-                        int(guild_id),
+                    batch.append((
                         int(user_id),
+                        int(guild_id),
                         warning.get("reason", ""),
                         int(warning.get("moderator", 0)),
                         warning.get("timestamp"),
                         None,
-                    )
+                    ))
+
+        # Вставляем все записи одним запросом
+        if batch:
+            await self._db.execute_many(
+                "INSERT INTO warnings (user_id, guild_id, reason, issued_by, issued_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+                batch,
+            )

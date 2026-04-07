@@ -6,7 +6,6 @@ from typing import Dict, List, Optional, Tuple, Union
 import logging
 import discord
 import os
-import pickle
 
 from infrastructure.config import LevelsStore
 
@@ -35,6 +34,8 @@ class LevelingSystem(LevelingServiceContract):
         self.data = self.load_data()
         self.xp_cooldowns: Dict[str, datetime] = {}
         self.use_db = True
+        self._last_cooldown_cleanup = datetime.now()
+        self._schema_checked = False
 
     def load_data(self) -> Dict:
         """Загрузка данных об уровнях из файла.
@@ -52,6 +53,23 @@ class LevelingSystem(LevelingServiceContract):
         # Сохраняем только если используем файловую систему
         if not self.use_db:
             self.store.save(self.data)
+
+    def _cleanup_old_cooldowns(self) -> None:
+        """Периодическая очистка устаревших кулдаунов для предотвращения утечки памяти."""
+        now = datetime.now()
+        # Очищаем каждые 5 минут
+        if (now - self._last_cooldown_cleanup).total_seconds() < 300:
+            return
+
+        # Удаляем кулдауны старше 2 минут (кулдаун 60 сек + запас)
+        cutoff = now - timedelta(seconds=120)
+        expired_keys = [key for key, expiry in self.xp_cooldowns.items() if expiry < cutoff]
+        for key in expired_keys:
+            del self.xp_cooldowns[key]
+
+        self._last_cooldown_cleanup = now
+        if expired_keys:
+            logger.debug(f"Очищено {len(expired_keys)} устаревших кулдаунов")
 
     def get_xp_for_level(self, level: int) -> int:
         """Расчет необходимого опыта для уровня.
@@ -106,6 +124,9 @@ class LevelingSystem(LevelingServiceContract):
         user_id = str(member.id)
         guild_id = str(member.guild.id)
 
+        # Периодическая очистка устаревших кулдаунов
+        self._cleanup_old_cooldowns()
+
         # Проверка кулдауна
         cooldown_key = f"{user_id}_{guild_id}"
         current_time = datetime.now()
@@ -128,6 +149,12 @@ class LevelingSystem(LevelingServiceContract):
         # Используем файловую систему как запасной вариант
         return await self._add_experience_file(member, user_id, guild_id)
 
+    async def _ensure_schema_once(self) -> None:
+        """Проверка схемы БД один раз при первом использовании."""
+        if not self._schema_checked:
+            await self.repository.ensure_last_message_time_column()
+            self._schema_checked = True
+
     async def _add_experience_db(
         self, member: discord.Member, user_id: str, guild_id: str, current_time: datetime
     ) -> Tuple[bool, Optional[int]]:
@@ -142,7 +169,7 @@ class LevelingSystem(LevelingServiceContract):
         Returns:
             Tuple[bool, Optional[int]]: (Было ли повышение уровня, Новый уровень)
         """
-        await self.repository.ensure_last_message_time_column()
+        await self._ensure_schema_once()
 
         # Рассчитываем случайное количество опыта (от 15 до 25)
         xp_gain = random.randint(15, 25)
@@ -311,7 +338,8 @@ class LevelingSystem(LevelingServiceContract):
             cached = redis_client.get(cache_key)
             if cached:
                 try:
-                    return pickle.loads(cached)
+                    import json
+                    return json.loads(cached.decode('utf-8'))
                 except Exception as e:
                     logger.warning(f"Failed to load cached leaderboard: {e}")
         # Use DB if available
@@ -320,7 +348,8 @@ class LevelingSystem(LevelingServiceContract):
                 result = await self.repository.get_leaderboard(int(guild_id), limit)
                 if redis_client:
                     try:
-                        redis_client.setex(cache_key, 60, pickle.dumps(result))
+                        import json
+                        redis_client.setex(cache_key, 60, json.dumps(result))
                     except Exception as e:
                         logger.warning(f"Failed to cache leaderboard: {e}")
                 return result

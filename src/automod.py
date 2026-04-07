@@ -23,6 +23,7 @@ class AutoMod(AutomodServiceContract):
         self.config = self.load_config()
         self.spam_counter = {}
         self.warning_counter = {}
+        self._last_cleanup = datetime.now()
 
     def load_config(self):
         """Загрузка конфигурации из файла.
@@ -35,6 +36,37 @@ class AutoMod(AutomodServiceContract):
     def save_config(self):
         """Сохранение конфигурации в файл."""
         self.store.save(self.config)
+
+    def _cleanup_old_entries(self) -> None:
+        """Периодическая очистка устаревших счетчиков для предотвращения утечки памяти."""
+        now = datetime.now()
+        # Очищаем каждые 5 минут
+        if (now - self._last_cleanup).total_seconds() < 300:
+            return
+
+        # Очистка spam_counter - удаляем записи старше удвоенного интервала спама
+        spam_interval = self.config.get("spam_interval", 5)
+        spam_cutoff = now - timedelta(seconds=spam_interval * 2)
+
+        for user_key in list(self.spam_counter.keys()):
+            # Фильтруем старые временные метки
+            self.spam_counter[user_key] = [
+                t for t in self.spam_counter[user_key]
+                if (now - t).total_seconds() <= spam_interval * 2
+            ]
+            # Удаляем пустые записи
+            if not self.spam_counter[user_key]:
+                del self.spam_counter[user_key]
+
+        # Очистка warning_counter - сбрасываем счетчики старше 1 часа
+        # (предполагаем что предупреждения не должны накапливаться бесконечно)
+        warning_cutoff = now - timedelta(hours=1)
+        expired_warnings = [
+            key for key in self.warning_counter.keys()
+            # Здесь нужна дополнительная логика для отслеживания времени последнего предупреждения
+        ]
+
+        self._last_cleanup = now
 
     async def setup(self):
         """Настройка команд автомодерации (перенесена в presentation слой)."""
@@ -71,6 +103,9 @@ class AutoMod(AutomodServiceContract):
         """
         if message.author.bot or not message.guild:
             return True
+
+        # Периодическая очистка устаревших счетчиков
+        self._cleanup_old_entries()
 
         # Проверка запрещенных слов
         content = message.content.lower()

@@ -72,19 +72,23 @@ class LevelsRepository(LevelsRepositoryContract):
 
     async def migrate_from_json(self, data: Dict) -> None:
         await self.ensure_last_message_time_column()
+        current_time = datetime.now().isoformat()
+
+        # Собираем все записи для батчинга
+        batch = []
         for guild_id, guild_data in data.items():
             for user_id, user_data in guild_data.items():
-                existing = await self._db.fetch_one(
-                    "SELECT user_id FROM levels WHERE user_id = ? AND guild_id = ?",
-                    (int(user_id), int(guild_id)),
-                )
-                if existing:
-                    continue
-                current_time = datetime.now().isoformat()
-                await self.create_user(
+                batch.append((
                     int(user_id),
                     int(guild_id),
                     user_data["xp"],
                     user_data["level"],
                     current_time,
-                )
+                ))
+
+        # Вставляем все записи одним запросом (игнорируем дубликаты)
+        if batch:
+            await self._db.execute_many(
+                "INSERT OR IGNORE INTO levels (user_id, guild_id, xp, level, last_message_time) VALUES (?, ?, ?, ?, ?)",
+                batch,
+            )
